@@ -8,7 +8,7 @@
 - Quản lý người dùng (đăng ký, đăng nhập)
 - Phân quyền người dùng (admin/user)
 - CRUD (Create, Read, Update, Delete) cho phim
-- Crawl dữ liệu phim từ 
+- Crawl dữ liệu phim từ Mọt Phim
 - Lưu trữ dữ liệu bằng JSON
 - Tải và hiển thị poster phim
 
