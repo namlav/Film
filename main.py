@@ -1,7 +1,4 @@
-#acc ad: admin,admin123
-"""
-được rồi về cơ bản ứng dụng xem phim hoạt động như vậy đã ổn. Giờ đến phần xử lý hệ thống ứng dụng. Tôi cần bạn giúp phân quyền người dùng, đơn giản là thêm một phần đăng nhập dành cho quản trị viên ở màn hình đăng nhập. Quản trị viên sẽ có toàn quyền truy cập dữ liệu ứng dụng (như thêm, xóa, sửa phim thông tin phim; khóa tài khoản người dùng,...). Người dùng bình thường chỉ có thể đăng nhập vào và chọn phim để xem cũng như thêm các phim vào mục yêu thích.
-"""
+#account admin: admin,admin123
 import tkinter as tk
 from tkinter import ttk, messagebox
 import json
@@ -16,10 +13,25 @@ import threading
 
 class MovieApp:
     def __init__(self, root):
+        
         self.root = root
         self.root.title("Movie Streaming Application")
-        self.root.geometry("1200x800")
-        
+        self.root.geometry("800x500")
+        self.root.resizable(False, False) 
+        window_width = 800
+        window_height = 500
+        screen_width = root.winfo_screenwidth()
+        screen_height = root.winfo_screenheight()
+        x = (screen_width - window_width) // 2
+        y = (screen_height - window_height) // 2
+        root.geometry(f"{window_width}x{window_height}+{x}+{y}")
+        root.configure(bg="white")
+        root.title("Movie Streaming App")
+        style = ttk.Style()
+        style.theme_use('default')
+        style.configure("TFrame", background="white")
+        style.configure("TLabel", background="white")
+        style.configure("TCheckbutton", background="white")
         # Khởi tạo dữ liệu
         self.movies = []
         self.users = []
@@ -63,45 +75,78 @@ class MovieApp:
             
         with open('data/users.json', 'w', encoding='utf-8') as f:
             json.dump(self.users, f, indent=4, ensure_ascii=False)
-    
+
+    def create_left_panel(self, parent):
+        frame = tk.Frame(parent, width=400, height=400, bg="white")
+        frame.pack(side=tk.LEFT, padx=(50, 10), pady=30)
+        frame.pack_propagate(False)
+
+        tk.Label(frame, text="🎬 Movie Manager", font=("Segoe UI", 24, "bold"), fg="#007BFF", bg="white").pack(pady=(10, 30))
+
+        try:
+            img = Image.open("images/login.png")
+            img = img.resize((320, 240), Image.Resampling.LANCZOS)
+            self.img_tk = ImageTk.PhotoImage(img)
+            tk.Label(frame, image=self.img_tk, bg="white").pack()
+        except:
+            tk.Label(frame, text="[Image not found]", fg="red", bg="white").pack()
+
+        return frame
+
     def show_login_screen(self):
-        """Hiển thị màn hình đăng nhập"""
-        # Xóa các widget cũ
+        # Xóa widget cũ
         for widget in self.root.winfo_children():
             widget.destroy()
-        
-        # Tạo frame chính
-        main_frame = ttk.Frame(self.root)
-        main_frame.pack(expand=True, fill=tk.BOTH, padx=20, pady=20)
-        
-        # Tạo frame cho form đăng nhập
-        login_frame = ttk.Frame(main_frame)
-        login_frame.pack(expand=True)
-        
-        # Tiêu đề
-        ttk.Label(login_frame, text="Movie Streaming App", font=('Arial', 20, 'bold')).pack(pady=20)
-        
-        # Form đăng nhập
-        ttk.Label(login_frame, text="Username:").pack(pady=5)
-        self.username_entry = ttk.Entry(login_frame, width=30)
-        self.username_entry.pack(pady=5)
-        
-        ttk.Label(login_frame, text="Password:").pack(pady=5)
-        self.password_entry = ttk.Entry(login_frame, width=30, show="*")
-        self.password_entry.pack(pady=5)
-        
-        # Thêm checkbox cho đăng nhập quản trị
+
+        self.root.title("Movie Manager - Sign In")
+        self.root.geometry("900x500")
+        self.root.configure(bg="white")
+        self.root.resizable(False, False)
+
+        bg_frame = tk.Frame(self.root, bg="white")
+        bg_frame.pack(fill=tk.BOTH, expand=True)
+
+        # ==== TRÁI ====
+        self.create_left_panel(bg_frame)
+
+        # ==== PHẢI ====
+        right_frame = tk.Frame(bg_frame, width=400, height=400, bg="white")
+        right_frame.pack(side=tk.RIGHT, padx=(10, 50), pady=30)
+        right_frame.pack_propagate(False)
+
+        tk.Label(right_frame, text="Sign in", font=("Segoe UI", 20, "bold"), fg="#007BFF", bg="white").pack(pady=(10, 25))
+
+        form = tk.Frame(right_frame, bg="white")
+        form.pack()
+
+        tk.Label(form, text="Username", font=("Segoe UI", 10), bg="white").grid(row=0, column=0, sticky="w")
+        self.username_entry = ttk.Entry(form, width=32, font=("Segoe UI", 10))
+        self.username_entry.grid(row=1, column=0, pady=(5, 15), ipady=4)
+
+        tk.Label(form, text="Password", font=("Segoe UI", 10), bg="white").grid(row=2, column=0, sticky="w")
+        self.password_entry = ttk.Entry(form, width=32, font=("Segoe UI", 10), show="*")
+        self.password_entry.grid(row=3, column=0, pady=(5, 15), ipady=4)
+
         self.is_admin = tk.BooleanVar()
-        ttk.Checkbutton(login_frame, text="Đăng nhập với tư cách quản trị viên", 
-                       variable=self.is_admin).pack(pady=5)
-        
-        # Nút đăng nhập và đăng ký
-        button_frame = ttk.Frame(login_frame)
-        button_frame.pack(pady=20)
-        
-        ttk.Button(button_frame, text="Login", command=self.login).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="Register", command=self.show_register).pack(side=tk.LEFT, padx=5)
-    
+        tk.Checkbutton(
+            form,
+            text="Log in as administrator",
+            variable=self.is_admin,
+            font=("Segoe UI", 9),
+            bg="white"
+        ).grid(row=4, column=0, sticky="w", pady=(5, 15))
+
+        ttk.Button(form, text="Sign in", command=self.login).grid(row=5, column=0, pady=(10, 20), ipadx=10)
+
+        bottom_frame = tk.Frame(right_frame, bg="white")
+        bottom_frame.pack()
+        tk.Label(bottom_frame, text="Don't have an account?", bg="white", font=("Segoe UI", 9)).pack(side=tk.LEFT)
+        register_link = tk.Label(
+            bottom_frame, text=" Sign up", fg="#007BFF", bg="white", cursor="hand2", font=("Segoe UI", 9, "underline")
+        )
+        register_link.pack(side=tk.LEFT)
+        register_link.bind("<Button-1>", lambda e: self.show_register_screen())
+
     def login(self):
         """Xử lý đăng nhập"""
         username = self.username_entry.get()
@@ -114,17 +159,18 @@ class MovieApp:
         
         # Kiểm tra đăng nhập quản trị
         if is_admin:
-            if username == "admin" and password == "admin123":  # Mật khẩu mặc định cho admin
-                self.current_user = {
-                    'username': 'admin',
-                    'role': 'admin'
-                }
-                messagebox.showinfo("Success", "Admin login successful!")
-                self.create_admin_gui()
-                return
-            else:
-                messagebox.showerror("Error", "Invalid admin credentials")
-                return
+            for user in self.users:
+                if user['username'] == username and user['password'] == password:
+                    if user.get('role') == 'admin':
+                        self.current_user = user
+                        messagebox.showinfo("Success", "Admin login successful!")
+                        self.create_admin_gui()
+                        return
+                    else:
+                        messagebox.showerror("Error", "You are not an administrator.")
+                        return
+            messagebox.showerror("Error", "Invalid admin credentials")
+            return
         
         # Kiểm tra đăng nhập người dùng thường
         for user in self.users:
@@ -340,54 +386,91 @@ class MovieApp:
         except Exception as e:
             messagebox.showerror("Error", f"An error occurred while refreshing movies: {str(e)}")
     
-    def show_register(self):
-        """Hiển thị form đăng ký"""
-        register_window = tk.Toplevel(self.root)
-        register_window.title("Register")
-        register_window.geometry("300x200")
-        
-        ttk.Label(register_window, text="Username:").pack(pady=5)
-        username_entry = ttk.Entry(register_window)
-        username_entry.pack(pady=5)
-        
-        ttk.Label(register_window, text="Password:").pack(pady=5)
-        password_entry = ttk.Entry(register_window, show="*")
-        password_entry.pack(pady=5)
-        
-        ttk.Label(register_window, text="Confirm Password:").pack(pady=5)
-        confirm_password_entry = ttk.Entry(register_window, show="*")
-        confirm_password_entry.pack(pady=5)
-        
+    def show_register_screen(self):
+    # Xóa widget cũ
+        for widget in self.root.winfo_children():
+            widget.destroy()
+
+        self.root.title("Movie Manager - Register")
+        self.root.geometry("900x500")
+        self.root.configure(bg="white")
+        self.root.resizable(False, False)
+
+        bg_frame = tk.Frame(self.root, bg="white")
+        bg_frame.pack(fill=tk.BOTH, expand=True)
+
+        # ==== TRÁI ====
+        self.create_left_panel(bg_frame)
+
+        # ==== PHẢI ====
+        right_frame = tk.Frame(bg_frame, width=400, height=400, bg="white")
+        right_frame.pack(side=tk.RIGHT, padx=(10, 50), pady=30)
+        right_frame.pack_propagate(False)
+
+        tk.Label(right_frame, text="Create Account", font=("Segoe UI", 20, "bold"), fg="#007BFF", bg="white").pack(pady=(10, 25))
+
+        form = tk.Frame(right_frame, bg="white")
+        form.pack()
+
+        # Username
+        tk.Label(form, text="Username", font=("Segoe UI", 10), bg="white").grid(row=0, column=0, sticky="w")
+        username_entry = ttk.Entry(form, width=32, font=("Segoe UI", 10))
+        username_entry.grid(row=1, column=0, pady=(5, 15), ipady=4)
+
+        # Password
+        tk.Label(form, text="Password", font=("Segoe UI", 10), bg="white").grid(row=2, column=0, sticky="w")
+        password_entry = ttk.Entry(form, width=32, font=("Segoe UI", 10), show="*")
+        password_entry.grid(row=3, column=0, pady=(5, 15), ipady=4)
+
+        # Confirm Password
+        tk.Label(form, text="Confirm Password", font=("Segoe UI", 10), bg="white").grid(row=4, column=0, sticky="w")
+        confirm_password_entry = ttk.Entry(form, width=32, font=("Segoe UI", 10), show="*")
+        confirm_password_entry.grid(row=5, column=0, pady=(5, 15), ipady=4)
+
         def register():
             username = username_entry.get()
             password = password_entry.get()
             confirm_password = confirm_password_entry.get()
-            
+
             if not username or not password or not confirm_password:
                 messagebox.showerror("Error", "Please fill in all fields")
                 return
-            
+
             if password != confirm_password:
                 messagebox.showerror("Error", "Passwords do not match")
                 return
-            
+
             for user in self.users:
                 if user['username'] == username:
                     messagebox.showerror("Error", "Username already exists")
                     return
-            
+
             self.users.append({
                 'username': username,
                 'password': password,
                 'role': 'user',
                 'favorites': []
             })
-            
+
             self.save_data()
             messagebox.showinfo("Success", "Registration successful!")
-            register_window.destroy()
-        
-        ttk.Button(register_window, text="Register", command=register).pack(pady=10)
+            self.show_login_screen()
+
+        ttk.Button(form, text="Register", command=register).grid(row=6, column=0, pady=(10, 20), ipadx=10)
+
+        # Link quay lại login
+        back_link = tk.Label(
+            right_frame,
+            text="← Back to Sign in",
+            fg="#007BFF",
+            bg="white",
+            cursor="hand2",
+            font=("Segoe UI", 9, "underline")
+        )
+        back_link.pack()
+        back_link.bind("<Button-1>", lambda e: self.show_login_screen())
+
+
     
     def logout(self):
         """Đăng xuất"""
@@ -407,89 +490,106 @@ class MovieApp:
         ttk.Label(profile_window, text=f"Role: {self.current_user['role']}", font=('Arial', 12)).pack(pady=10)
 
     def create_admin_gui(self):
-        """Tạo giao diện quản trị"""
-        # Xóa các widget cũ
         for widget in self.root.winfo_children():
             widget.destroy()
-        
-        # Tạo menu
+
+        main_frame = tk.Frame(self.root, bg="white")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+
+        # ==== ẢNH BÊN TRÁI ====
+        left_frame = tk.Frame(main_frame, width=300, bg="white")
+        left_frame.pack(side=tk.LEFT, fill=tk.Y, padx=20, pady=20)
+
+        try:
+            img = Image.open("images/login.png")
+            img = img.resize((250, 200), Image.LANCZOS)
+            self.admin_img = ImageTk.PhotoImage(img)
+            tk.Label(left_frame, image=self.admin_img, bg="white").pack()
+            tk.Label(left_frame, text="🎬 Movie Manager", font=("Segoe UI", 16, "bold"), fg="#007BFF", bg="white").pack(pady=10)
+        except:
+            tk.Label(left_frame, text="[Không thể tải ảnh]", fg="red", bg="white").pack()
+
+        # ==== NOTEBOOK BÊN PHẢI ====
+        right_frame = tk.Frame(main_frame)
+        right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+
         self.menu_bar = tk.Menu(self.root)
         self.root.config(menu=self.menu_bar)
         
-        # Menu File
         file_menu = tk.Menu(self.menu_bar, tearoff=0)
         self.menu_bar.add_cascade(label="File", menu=file_menu)
         file_menu.add_command(label="Refresh Movies", command=self.refresh_movies)
         file_menu.add_separator()
         file_menu.add_command(label="Logout", command=self.logout)
         file_menu.add_command(label="Exit", command=self.root.quit)
-        
-        # Tạo notebook cho các tab quản lý
-        notebook = ttk.Notebook(self.root)
+
+        notebook = ttk.Notebook(right_frame)
         notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
-        
-        # Tab quản lý phim
+
+        # === TAB QUẢN LÝ PHIM ===
         movies_frame = ttk.Frame(notebook)
         notebook.add(movies_frame, text="Quản lý phim")
-        
-        # Tạo canvas và scrollbar cho danh sách phim
-        canvas = tk.Canvas(movies_frame)
-        scrollbar = ttk.Scrollbar(movies_frame, orient="vertical", command=canvas.yview)
-        scrollable_frame = ttk.Frame(canvas)
-        
-        scrollable_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
-        
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
-        
-        canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
-        
-        # Hiển thị danh sách phim với các nút quản lý
+
+        movie_canvas = tk.Canvas(movies_frame)
+        movie_scrollbar = ttk.Scrollbar(movies_frame, orient="vertical", command=movie_canvas.yview)
+        scrollable_movie_frame = ttk.Frame(movie_canvas)
+
+        scrollable_movie_frame.bind("<Configure>", lambda e: movie_canvas.configure(scrollregion=movie_canvas.bbox("all")))
+        movie_canvas.create_window((0, 0), window=scrollable_movie_frame, anchor="nw")
+        movie_canvas.configure(yscrollcommand=movie_scrollbar.set)
+
+        movie_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        movie_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
         for movie in self.movies:
-            movie_frame = ttk.Frame(scrollable_frame, padding=5)
-            movie_frame.pack(fill=tk.X, pady=2)
-            
-            ttk.Label(movie_frame, text=movie['title'], width=40).pack(side=tk.LEFT, padx=5)
-            ttk.Button(movie_frame, text="Sửa", 
-                      command=lambda m=movie: self.edit_movie(m)).pack(side=tk.LEFT, padx=2)
-            ttk.Button(movie_frame, text="Xóa", 
-                      command=lambda m=movie: self.delete_movie(m)).pack(side=tk.LEFT, padx=2)
-        
-        # Tab quản lý người dùng
+            movie_row = ttk.Frame(scrollable_movie_frame, padding=5)
+            movie_row.pack(fill=tk.X, pady=2)
+            ttk.Label(movie_row, text=movie["title"], width=40).pack(side=tk.LEFT, padx=5)
+            ttk.Button(movie_row, text="Sửa", command=lambda m=movie: self.edit_movie(m)).pack(side=tk.LEFT, padx=2)
+            ttk.Button(movie_row, text="Xóa", command=lambda m=movie: self.delete_movie(m)).pack(side=tk.LEFT, padx=2)
+
+        # === TAB QUẢN LÝ NGƯỜI DÙNG ===
         users_frame = ttk.Frame(notebook)
         notebook.add(users_frame, text="Quản lý người dùng")
-        
-        # Tạo canvas và scrollbar cho danh sách người dùng
-        canvas_users = tk.Canvas(users_frame)
-        scrollbar_users = ttk.Scrollbar(users_frame, orient="vertical", command=canvas_users.yview)
-        scrollable_frame_users = ttk.Frame(canvas_users)
-        
-        scrollable_frame_users.bind(
-            "<Configure>",
-            lambda e: canvas_users.configure(scrollregion=canvas_users.bbox("all"))
-        )
-        
-        canvas_users.create_window((0, 0), window=scrollable_frame_users, anchor="nw")
-        canvas_users.configure(yscrollcommand=scrollbar_users.set)
-        
-        canvas_users.pack(side="left", fill="both", expand=True)
-        scrollbar_users.pack(side="right", fill="y")
-        
-        # Hiển thị danh sách người dùng với các nút quản lý
+
+        user_canvas = tk.Canvas(users_frame)
+        user_scrollbar = ttk.Scrollbar(users_frame, orient="vertical", command=user_canvas.yview)
+        scrollable_user_frame = ttk.Frame(user_canvas)
+
+        scrollable_user_frame.bind("<Configure>", lambda e: user_canvas.configure(scrollregion=user_canvas.bbox("all")))
+        user_canvas.create_window((0, 0), window=scrollable_user_frame, anchor="nw")
+        user_canvas.configure(yscrollcommand=user_scrollbar.set)
+
+        user_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        user_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Dòng tiêu đề
+        header = ttk.Frame(scrollable_user_frame, padding=5)
+        header.pack(fill=tk.X, pady=(0, 5))
+        ttk.Label(header, text="Username", width=20).pack(side=tk.LEFT, padx=5)
+        ttk.Label(header, text="Role", width=10).pack(side=tk.LEFT, padx=5)
+        ttk.Label(header, text="Actions", width=20).pack(side=tk.LEFT, padx=5)
+
+        # Danh sách user
         for user in self.users:
-            user_frame = ttk.Frame(scrollable_frame_users, padding=5)
-            user_frame.pack(fill=tk.X, pady=2)
-            
-            ttk.Label(user_frame, text=user['username'], width=20).pack(side=tk.LEFT, padx=5)
-            ttk.Label(user_frame, text=user['role'], width=10).pack(side=tk.LEFT, padx=5)
-            ttk.Button(user_frame, text="Khóa/Mở khóa", 
-                      command=lambda u=user: self.toggle_user_lock(u)).pack(side=tk.LEFT, padx=2)
-            ttk.Button(user_frame, text="Xóa", 
-                      command=lambda u=user: self.delete_user(u)).pack(side=tk.LEFT, padx=2)
+            user_row = ttk.Frame(scrollable_user_frame, padding=5)
+            user_row.pack(fill=tk.X, pady=2)
+
+            ttk.Label(user_row, text=user["username"], width=20).pack(side=tk.LEFT, padx=5)
+            ttk.Label(user_row, text=user["role"], width=10).pack(side=tk.LEFT, padx=5)
+
+            # Chỉ tạo nút cho user thường
+            if user["role"] != "admin":
+                ttk.Button(
+                    user_row, text="Khóa/Mở khóa",
+                    command=lambda u=user: self.toggle_user_lock(u)
+                ).pack(side=tk.LEFT, padx=2)
+
+                ttk.Button(
+                    user_row, text="Xóa",
+                    command=lambda u=user: self.delete_user(u)
+                ).pack(side=tk.LEFT, padx=2)
+
 
     def edit_movie(self, movie):
         """Sửa thông tin phim"""
