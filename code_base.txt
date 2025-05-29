@@ -1,0 +1,365 @@
+crawl:
+
+import requests
+from bs4 import BeautifulSoup
+import json
+import os
+
+class MotphimCrawler:
+    def __init__(self):
+        self.base_url = "https://motphimtop.com/phim-le/"
+        self.movies = []
+
+    def crawl_movies(self, num_movies=10):
+        print("Đang lấy danh sách phim từ motphimtop.com ...")
+        response = requests.get(self.base_url)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, "html.parser")
+        movie_items = soup.select("article.item.movies")[:num_movies]
+        print(f"Tìm thấy {len(movie_items)} phim")
+        for item in movie_items:
+            try:
+                # Lấy tên phim và link chi tiết
+                a_tag = item.select_one("div.data h3 a")
+                title = a_tag.text.strip() if a_tag else "Unknown"
+                url = a_tag["href"] if a_tag else ""
+                # Lấy poster
+                img_tag = item.select_one("div.poster img")
+                poster_url = img_tag["src"] if img_tag else ""
+                # Lấy năm
+                year_tag = item.select_one("div.data span")
+                year = year_tag.text.strip()[-4:] if year_tag and year_tag.text.strip()[-4:].isdigit() else "Unknown"
+                # Lấy rating
+                rating_tag = item.select_one("div.rating")
+                rating = rating_tag.text.strip() if rating_tag else "N/A"
+                # Lấy mô tả và link xem phim thực sự từ trang chi tiết
+                description, movie_url = self.get_movie_detail(url)
+                self.movies.append({
+                    "title": title,
+                    "year": year,
+                    "rating": rating,
+                    "description": description,
+                    "poster_url": poster_url,
+                    "movie_url": movie_url,
+                    "url": url
+                })
+                print(f"Đã lấy: {title}")
+            except Exception as e:
+                print(f"Lỗi khi lấy phim: {e}")
+                continue
+        # Lưu file
+        if not os.path.exists('data'):
+            os.makedirs('data')
+        with open("data/movies.json", "w", encoding="utf-8") as f:
+            json.dump(self.movies, f, ensure_ascii=False, indent=4)
+        print(f"Đã lưu {len(self.movies)} phim vào data/movies.json")
+
+    def get_movie_detail(self, detail_url):
+        res = requests.get(detail_url)
+        res.raise_for_status()
+        soup = BeautifulSoup(res.text, "html.parser")
+        # Lấy mô tả
+        desc_tag = soup.find('div', class_='description')
+        description = desc_tag.text.strip() if desc_tag else ""
+        # Lấy link xem phim thực sự (iframe player)
+        iframe = soup.select_one('div.pframe iframe')
+        movie_url = iframe["src"] if iframe and iframe.has_attr("src") else detail_url
+        return description, movie_url
+
+if __name__ == "__main__":
+    crawler = MotphimCrawler()
+    crawler.crawl_movies(10)
+
+main:
+import tkinter as tk
+from tkinter import ttk, messagebox
+import json
+import os
+from PIL import Image, ImageTk
+import requests
+from bs4 import BeautifulSoup
+import webbrowser
+from movie_crawler import MotphimCrawler
+import threading
+
+class MovieApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Movie Streaming Application")
+        self.root.geometry("1200x800")
+        
+        # Khởi tạo dữ liệu
+        self.movies = []
+        self.users = []
+        self.current_user = None
+        
+        # Tạo các thư mục cần thiết
+        self.create_directories()
+        
+        # Load dữ liệu
+        self.load_data()
+        
+        # Tạo giao diện đăng nhập
+        self.show_login_screen()
+    
+    def create_directories(self):
+        """Tạo các thư mục cần thiết cho ứng dụng"""
+        directories = ['data', 'images', 'movies']
+        for directory in directories:
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+    
+    def load_data(self):
+        """Load dữ liệu từ file JSON"""
+        try:
+            with open('data/movies.json', 'r', encoding='utf-8') as f:
+                self.movies = json.load(f)
+        except FileNotFoundError:
+            self.movies = []
+            
+        try:
+            with open('data/users.json', 'r', encoding='utf-8') as f:
+                self.users = json.load(f)
+        except FileNotFoundError:
+            self.users = []
+    
+    def save_data(self):
+        """Lưu dữ liệu vào file JSON"""
+        with open('data/movies.json', 'w') as f:
+            json.dump(self.movies, f, indent=4)
+            
+        with open('data/users.json', 'w') as f:
+            json.dump(self.users, f, indent=4)
+    
+    def show_login_screen(self):
+        """Hiển thị màn hình đăng nhập"""
+        # Xóa các widget cũ
+        for widget in self.root.winfo_children():
+            widget.destroy()
+        
+        # Tạo frame chính
+        main_frame = ttk.Frame(self.root)
+        main_frame.pack(expand=True, fill=tk.BOTH, padx=20, pady=20)
+        
+        # Tạo frame cho form đăng nhập
+        login_frame = ttk.Frame(main_frame)
+        login_frame.pack(expand=True)
+        
+        # Tiêu đề
+        ttk.Label(login_frame, text="Movie Streaming App", font=('Arial', 20, 'bold')).pack(pady=20)
+        
+        # Form đăng nhập
+        ttk.Label(login_frame, text="Username:").pack(pady=5)
+        self.username_entry = ttk.Entry(login_frame, width=30)
+        self.username_entry.pack(pady=5)
+        
+        ttk.Label(login_frame, text="Password:").pack(pady=5)
+        self.password_entry = ttk.Entry(login_frame, width=30, show="*")
+        self.password_entry.pack(pady=5)
+        
+        # Nút đăng nhập và đăng ký
+        button_frame = ttk.Frame(login_frame)
+        button_frame.pack(pady=20)
+        
+        ttk.Button(button_frame, text="Login", command=self.login).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Register", command=self.show_register).pack(side=tk.LEFT, padx=5)
+    
+    def login(self):
+        """Xử lý đăng nhập"""
+        username = self.username_entry.get()
+        password = self.password_entry.get()
+        
+        if not username or not password:
+            messagebox.showerror("Error", "Please enter both username and password")
+            return
+        
+        for user in self.users:
+            if user['username'] == username and user['password'] == password:
+                self.current_user = user
+                messagebox.showinfo("Success", "Login successful!")
+                self.create_main_gui()
+                return
+        
+        messagebox.showerror("Error", "Invalid username or password")
+    
+    def create_main_gui(self):
+        """Tạo giao diện chính sau khi đăng nhập"""
+        # Xóa các widget cũ
+        for widget in self.root.winfo_children():
+            widget.destroy()
+        
+        # Tạo menu
+        self.menu_bar = tk.Menu(self.root)
+        self.root.config(menu=self.menu_bar)
+        
+        # Menu File
+        file_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.menu_bar.add_cascade(label="File", menu=file_menu)
+        file_menu.add_command(label="Refresh Movies", command=self.refresh_movies)
+        file_menu.add_separator()
+        file_menu.add_command(label="Logout", command=self.logout)
+        file_menu.add_command(label="Exit", command=self.root.quit)
+        
+        # Menu User
+        user_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.menu_bar.add_cascade(label="User", menu=user_menu)
+        user_menu.add_command(label="Profile", command=self.show_profile)
+        
+        # Tạo frame chính
+        self.main_frame = ttk.Frame(self.root)
+        self.main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Tạo frame cho danh sách phim
+        self.movie_frame = ttk.Frame(self.main_frame)
+        self.movie_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Tạo canvas và scrollbar
+        self.canvas = tk.Canvas(self.movie_frame)
+        self.scrollbar = ttk.Scrollbar(self.movie_frame, orient="vertical", command=self.canvas.yview)
+        self.scrollable_frame = ttk.Frame(self.canvas)
+        
+        self.scrollable_frame.bind(
+            "<Configure>",
+            lambda e: self.canvas.configure(
+                scrollregion=self.canvas.bbox("all")
+            )
+        )
+        
+        self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+        
+        self.canvas.pack(side="left", fill="both", expand=True)
+        self.scrollbar.pack(side="right", fill="y")
+        
+        # Hiển thị danh sách phim
+        self.display_movies()
+    
+    def display_movies(self):
+        """Hiển thị danh sách phim"""
+        # Xóa các widget cũ
+        for widget in self.scrollable_frame.winfo_children():
+            widget.destroy()
+        
+        if not self.movies:
+            ttk.Label(self.scrollable_frame, text="No movies available. Please refresh the list.", font=('Arial', 12)).pack(pady=20)
+            return
+        
+        # Hiển thị các phim
+        for movie in self.movies:
+            movie_frame = ttk.Frame(self.scrollable_frame, padding=10)
+            movie_frame.pack(fill=tk.X, pady=5)
+            
+            # Hiển thị poster
+            try:
+                poster_path = f"images/{movie['title'].replace(' ', '_')}.jpg"
+                if os.path.exists(poster_path):
+                    image = Image.open(poster_path)
+                    image = image.resize((150, 200), Image.LANCZOS)
+                    photo = ImageTk.PhotoImage(image)
+                    poster_label = ttk.Label(movie_frame, image=photo)
+                    poster_label.image = photo
+                    poster_label.pack(side=tk.LEFT, padx=10)
+            except Exception as e:
+                print(f"Error loading poster: {str(e)}")
+            
+            # Hiển thị thông tin phim
+            info_frame = ttk.Frame(movie_frame)
+            info_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+            
+            ttk.Label(info_frame, text=movie['title'], font=('Arial', 14, 'bold')).pack(anchor='w')
+            ttk.Label(info_frame, text=f"Year: {movie['year']}").pack(anchor='w')
+            ttk.Label(info_frame, text=f"Rating: {movie['rating']}").pack(anchor='w')
+            ttk.Label(info_frame, text=movie['description'], wraplength=600).pack(anchor='w', pady=5)
+            
+            # Nút xem phim
+            ttk.Button(
+                info_frame,
+                text="Watch Movie",
+                command=lambda m=movie: self.watch_movie(m)
+            ).pack(anchor='w', pady=5)
+    
+    def watch_movie(self, movie):
+        """Xem phim trong ứng dụng"""
+        # Mở trình duyệt để xem phim
+        webbrowser.open(movie['movie_url'])
+    
+    def refresh_movies(self):
+        """Làm mới danh sách phim"""
+        crawler = MotphimCrawler()
+        if crawler.crawl_movies():
+            self.movies = crawler.movies
+            self.save_data()
+            self.display_movies()
+            messagebox.showinfo("Success", "Movies refreshed successfully!")
+        else:
+            messagebox.showerror("Error", "Failed to refresh movies")
+    
+    def show_register(self):
+        """Hiển thị form đăng ký"""
+        register_window = tk.Toplevel(self.root)
+        register_window.title("Register")
+        register_window.geometry("300x200")
+        
+        ttk.Label(register_window, text="Username:").pack(pady=5)
+        username_entry = ttk.Entry(register_window)
+        username_entry.pack(pady=5)
+        
+        ttk.Label(register_window, text="Password:").pack(pady=5)
+        password_entry = ttk.Entry(register_window, show="*")
+        password_entry.pack(pady=5)
+        
+        ttk.Label(register_window, text="Confirm Password:").pack(pady=5)
+        confirm_password_entry = ttk.Entry(register_window, show="*")
+        confirm_password_entry.pack(pady=5)
+        
+        def register():
+            username = username_entry.get()
+            password = password_entry.get()
+            confirm_password = confirm_password_entry.get()
+            
+            if not username or not password or not confirm_password:
+                messagebox.showerror("Error", "Please fill in all fields")
+                return
+            
+            if password != confirm_password:
+                messagebox.showerror("Error", "Passwords do not match")
+                return
+            
+            for user in self.users:
+                if user['username'] == username:
+                    messagebox.showerror("Error", "Username already exists")
+                    return
+            
+            self.users.append({
+                'username': username,
+                'password': password,
+                'role': 'user'
+            })
+            
+            self.save_data()
+            messagebox.showinfo("Success", "Registration successful!")
+            register_window.destroy()
+        
+        ttk.Button(register_window, text="Register", command=register).pack(pady=10)
+    
+    def logout(self):
+        """Đăng xuất"""
+        self.current_user = None
+        self.show_login_screen()
+    
+    def show_profile(self):
+        """Hiển thị thông tin người dùng"""
+        if not self.current_user:
+            return
+        
+        profile_window = tk.Toplevel(self.root)
+        profile_window.title("User Profile")
+        profile_window.geometry("300x150")
+        
+        ttk.Label(profile_window, text=f"Username: {self.current_user['username']}", font=('Arial', 12)).pack(pady=10)
+        ttk.Label(profile_window, text=f"Role: {self.current_user['role']}", font=('Arial', 12)).pack(pady=10)
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = MovieApp(root)
+    root.mainloop()
