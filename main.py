@@ -26,7 +26,7 @@ class MovieApp:
         y = (screen_height - window_height) // 2
         root.geometry(f"{window_width}x{window_height}+{x}+{y}")
         root.configure(bg="white")
-        root.title("Movie Streaming")
+        root.title("Movie Streaming App")
         style = ttk.Style()
         style.theme_use('default')
         style.configure("TFrame", background="white")
@@ -81,7 +81,7 @@ class MovieApp:
         frame.pack(side=tk.LEFT, padx=(50, 10), pady=30)
         frame.pack_propagate(False)
 
-        tk.Label(frame, text="🎬 Movie Stream", font=("Segoe UI", 24, "bold"), fg="#007BFF", bg="white").pack(pady=(10, 30))
+        tk.Label(frame, text="🎬 Movie Manager", font=("Segoe UI", 24, "bold"), fg="#007BFF", bg="white").pack(pady=(10, 30))
 
         try:
             img = Image.open("images/login.png")
@@ -194,33 +194,30 @@ class MovieApp:
             self.canvas.yview_scroll(1, "units")
     
     def create_main_gui(self):
-        """Tạo giao diện chính sau khi đăng nhập"""
         # Xóa các widget cũ
         for widget in self.root.winfo_children():
             widget.destroy()
-        
+
         # Tạo menu
         self.menu_bar = tk.Menu(self.root)
         self.root.config(menu=self.menu_bar)
-        
+
         # Menu File
         file_menu = tk.Menu(self.menu_bar, tearoff=0)
         self.menu_bar.add_cascade(label="File", menu=file_menu)
-        file_menu.add_command(label="Refresh Movies", command=self.refresh_movies)
         file_menu.add_separator()
         file_menu.add_command(label="Logout", command=self.logout)
         file_menu.add_command(label="Exit", command=self.root.quit)
-        
+
         # Menu User
         user_menu = tk.Menu(self.menu_bar, tearoff=0)
         self.menu_bar.add_cascade(label="User", menu=user_menu)
         user_menu.add_command(label="Profile", command=self.show_profile)
         user_menu.add_command(label="Yêu thích", command=self.show_favorites)
-        
         # Tạo frame chính
         self.main_frame = ttk.Frame(self.root)
         self.main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        
+
         # Thanh tìm kiếm
         search_frame = ttk.Frame(self.main_frame)
         search_frame.pack(fill=tk.X, pady=5)
@@ -229,41 +226,38 @@ class MovieApp:
         self.search_entry.pack(side=tk.LEFT, padx=5)
         self.search_criteria = tk.StringVar(value="Tên phim")
         self.criteria_combobox = ttk.Combobox(search_frame, textvariable=self.search_criteria, values=["Tên phim", "Năm", "Thể loại"], state="readonly", width=12)
-        self.criteria_combobox.pack(side=tk.LEFT, padx=5)
+        self.criteria_combobox.pack_forget()  # Ẩn combobox nếu muốn xóa luôn
+
         ttk.Button(search_frame, text="Tìm kiếm", command=self.search_movies).pack(side=tk.LEFT, padx=5)
         ttk.Button(search_frame, text="Hiện tất cả", command=self.show_all_movies).pack(side=tk.LEFT, padx=5)
-        
-        # Tạo frame cho danh sách phim
+
+        # Không hiển thị các label và entry lọc nâng cao
+        self.rating_filter = tk.StringVar()
+        self.year_filter = tk.StringVar()
+
+        # Frame danh sách phim
         self.movie_frame = ttk.Frame(self.main_frame)
         self.movie_frame.pack(fill=tk.BOTH, expand=True)
-        
-        # Tạo canvas và scrollbar
+
+        # Canvas + Scroll
         self.canvas = tk.Canvas(self.movie_frame)
         self.scrollbar = ttk.Scrollbar(self.movie_frame, orient="vertical", command=self.canvas.yview)
         self.scrollable_frame = ttk.Frame(self.canvas)
-        
-        self.scrollable_frame.bind(
-            "<Configure>",
-            lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
-        )
-        
-        # Thêm binding để cập nhật width khi canvas thay đổi kích thước
-        self.canvas.bind(
-            "<Configure>",
-            lambda e: self.canvas.itemconfig(self.canvas_window, width=e.width)
-        )
-        
+
+        self.scrollable_frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
+        self.canvas.bind("<Configure>", lambda e: self.canvas.itemconfig(self.canvas_window, width=e.width))
+
         self.canvas_window = self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
-        
         self.canvas.configure(yscrollcommand=self.scrollbar.set)
         self.canvas.pack(side="left", fill="both", expand=True)
         self.scrollbar.pack(side="right", fill="y")
-        
-        # Hiển thị danh sách phim
+
+        self.movies_per_page = 5
+        self.current_page = 0
         self.display_movies()
 
-        # Gắn sự kiện scroll chuột
-        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)  # Windows/macOS
+        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+
     
     def show_all_movies(self):
         self.display_movies()
@@ -271,91 +265,135 @@ class MovieApp:
     def search_movies(self):
         keyword = self.search_var.get().strip().lower()
         criteria = self.search_criteria.get()
-        if not keyword:
-            self.display_movies()
-            return
+        rating_min = self.rating_filter.get()
+        year_filter = self.year_filter.get()
+
+        try:
+            rating_min = float(rating_min) if rating_min else None
+        except:
+            rating_min = None
+
         filtered = []
         for movie in self.movies:
-            if criteria == "Tên phim" and keyword in movie.get('title', '').lower():
+            match = True
+
+            # Tìm kiếm chính
+            if keyword:
+                if criteria == "Tên phim" and keyword not in movie.get('title', '').lower():
+                    match = False
+                if criteria == "Năm" and keyword not in str(movie.get('year', '')).lower():
+                    match = False
+                if criteria == "Thể loại" and keyword not in movie.get('genre', '').lower():
+                    match = False
+
+            # Lọc nâng cao
+            if rating_min is not None:
+                try:
+                    if float(movie.get('rating', 0)) < rating_min:
+                        match = False
+                except:
+                    match = False
+            if year_filter and str(movie.get('year', '')) != year_filter:
+                match = False
+
+            if match:
                 filtered.append(movie)
-            elif criteria == "Năm" and keyword in str(movie.get('year', '')).lower():
-                filtered.append(movie)
-            elif criteria == "Thể loại" and keyword in movie.get('genre', '').lower():
-                filtered.append(movie)
+
+        self.current_page = 0
+        self.display_movies(filtered)
+
+    def filter_by_genre(self, genre):
+        """Lọc phim theo thể loại"""
+        filtered = [m for m in self.movies if genre.lower() in m.get('genre', '').lower()]
+        self.search_var.set("")
+        self.rating_filter.set("")
+        self.year_filter.set("")
+        self.current_page = 0
         self.display_movies(filtered)
 
     def display_movies(self, movies=None):
-        """Hiển thị danh sách phim"""
-        # Xóa các widget cũ
         for widget in self.scrollable_frame.winfo_children():
             widget.destroy()
 
         movie_list = movies if movies is not None else self.movies
-        print("Số lượng phim để hiển thị:", len(movie_list))  # Debug
+        print("Số lượng phim để hiển thị:", len(movie_list))
 
         if not movie_list:
-            ttk.Label(self.scrollable_frame, text="No movies available. Please refresh the list.", font=('Arial', 12)).pack(pady=20)
+            ttk.Label(self.scrollable_frame, text="No movies available.", font=('Arial', 12)).pack(pady=20)
             return
 
-        for movie in movie_list:
-            print("Movie:", movie)  # Debug
-            movie_frame = ttk.Frame(self.scrollable_frame, padding=10)
-            movie_frame.pack(fill=tk.X, pady=5)
+        total_pages = (len(movie_list) - 1) // self.movies_per_page + 1
+        start = self.current_page * self.movies_per_page
+        end = start + self.movies_per_page
+        page_movies = movie_list[start:end]
 
-            # Hiển thị poster (nếu có)
-            poster_displayed = False
-            poster_path = f"images/{movie['title'].replace(' ', '_')}.jpg"
-            try:
-                if not os.path.exists(poster_path) and movie.get('poster_url'):
-                    response = requests.get(movie['poster_url'], timeout=10)
-                    if response.status_code == 200:
-                        with open(poster_path, 'wb') as f:
-                            f.write(response.content)
-                if os.path.exists(poster_path):
-                    try:
-                        image = Image.open(poster_path)
-                        image = image.resize((150, 200), Image.LANCZOS)
-                        photo = ImageTk.PhotoImage(image)
-                        poster_label = ttk.Label(movie_frame, image=photo)
-                        poster_label.image = photo
-                        poster_label.pack(side=tk.LEFT, padx=10)
-                        poster_displayed = True
-                    except UnidentifiedImageError:
-                        print(f"Ảnh poster bị lỗi: {poster_path}")
-            except Exception as e:
-                print(f"Error loading poster: {str(e)}")
+        for movie in page_movies:
+            self.create_movie_widget(movie)
 
-            # Nếu không có poster, hiển thị label trống hoặc ảnh mặc định
-            if not poster_displayed:
-                poster_label = ttk.Label(movie_frame, text="[No Poster]", width=20)
-                poster_label.pack(side=tk.LEFT, padx=10)
+        # Phân trang
+        pagination_frame = ttk.Frame(self.scrollable_frame)
+        pagination_frame.pack(pady=10)
+        ttk.Button(pagination_frame, text="Trang trước", command=lambda: self.change_page(-1, movie_list)).pack(side=tk.LEFT, padx=5)
+        ttk.Label(pagination_frame, text=f"Trang {self.current_page + 1} / {total_pages}").pack(side=tk.LEFT, padx=5)
+        ttk.Button(pagination_frame, text="Trang sau", command=lambda: self.change_page(1, movie_list)).pack(side=tk.LEFT, padx=5)
 
-            # Luôn hiển thị thông tin phim
-            info_frame = ttk.Frame(movie_frame)
-            info_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-            ttk.Label(info_frame, text=movie.get('title', 'No title'), font=('Arial', 14, 'bold')).pack(anchor='w')
-            ttk.Label(info_frame, text=f"Year: {movie.get('year', 'Unknown')}").pack(anchor='w')
-            ttk.Label(info_frame, text=f"Rating: {movie.get('rating', 'N/A')}").pack(anchor='w')
-            ttk.Label(info_frame, text=movie.get('description', ''), wraplength=600).pack(anchor='w', pady=5)
-            ttk.Button(
-                info_frame,
-                text="Xem phim",
-                command=lambda m=movie: self.watch_movie(m)
-            ).pack(anchor='w', pady=5)
-            ttk.Button(
-                info_frame,
-                text="Yêu thích",
-                command=lambda m=movie: self.add_to_favorites(m)
-            ).pack(anchor='w', pady=5)
-    
+    def change_page(self, delta, movie_list):
+        total_pages = (len(movie_list) - 1) // self.movies_per_page + 1
+        self.current_page = max(0, min(self.current_page + delta, total_pages - 1))
+        self.display_movies(movie_list)
+
+    def create_movie_widget(self, movie):
+        movie_frame = ttk.Frame(self.scrollable_frame, padding=10, style="Movie.TFrame")
+        movie_frame.pack(fill=tk.X, pady=8)
+
+        # === POSTER ===
+        poster_displayed = False
+        poster_path = f"images/{movie['title'].replace(' ', '_')}.jpg"
+        try:
+            if not os.path.exists(poster_path) and movie.get('poster_url'):
+                response = requests.get(movie['poster_url'], timeout=10)
+                if response.status_code == 200:
+                    with open(poster_path, 'wb') as f:
+                        f.write(response.content)
+            if os.path.exists(poster_path):
+                try:
+                    image = Image.open(poster_path)
+                    image = image.resize((100, 150), Image.LANCZOS)
+                    photo = ImageTk.PhotoImage(image)
+                    poster_label = ttk.Label(movie_frame, image=photo, style="Movie.TLabel")
+                    poster_label.image = photo
+                    poster_label.pack(side=tk.LEFT, padx=(10, 15))
+                    poster_displayed = True
+                except UnidentifiedImageError:
+                    print(f"Ảnh lỗi: {poster_path}")
+        except Exception as e:
+            print(f"Lỗi tải ảnh: {str(e)}")
+
+        if not poster_displayed:
+            ttk.Label(movie_frame, text="[No Poster]", width=15).pack(side=tk.LEFT, padx=(10, 15))
+
+        # === INFO ===
+        info_frame = ttk.Frame(movie_frame, style="Movie.TFrame")
+        info_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        ttk.Label(info_frame, text=movie.get('title', 'No title'), font=('Segoe UI', 14, 'bold')).pack(anchor='w', pady=(0, 2))
+        ttk.Label(info_frame, text=f"Năm: {movie.get('year', 'Unknown')}").pack(anchor='w')
+        ttk.Label(info_frame, text=f"Rating: {movie.get('rating', 'N/A')}").pack(anchor='w')
+        ttk.Label(info_frame, text=movie.get('description', ''), wraplength=550, justify=tk.LEFT).pack(anchor='w', pady=5)
+
+        button_frame = ttk.Frame(info_frame)
+        button_frame.pack(anchor='w', pady=(0, 5))
+
+        ttk.Button(button_frame, text="▶ Xem phim", command=lambda m=movie: self.watch_movie(m)).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(button_frame, text="❤ Yêu thích", command=lambda m=movie: self.add_to_favorites(m)).pack(side=tk.LEFT)
+
     def watch_movie(self, movie):
         webbrowser.open(movie['movie_url'])
     
     def add_to_favorites(self, movie):
-        if 'favorites' not in self.current_user:
-            self.current_user['favorites'] = []
-        if movie['url'] not in [f['url'] for f in self.current_user['favorites']]:
-            self.current_user['favorites'].append(movie)
+        favorites = self.current_user.setdefault('favorites', [])
+        if movie['url'] not in [f['url'] for f in favorites]:
+            favorites.append(movie)
             self.save_data()
             messagebox.showinfo("Thành công", f"Đã thêm {movie['title']} vào danh sách yêu thích!")
         else:
@@ -366,26 +404,27 @@ class MovieApp:
         fav_window = tk.Toplevel(self.root)
         fav_window.title("Danh sách yêu thích")
         fav_window.geometry("800x600")
-        frame = ttk.Frame(fav_window)
-        frame.pack(fill=tk.BOTH, expand=True)
+
+        canvas = tk.Canvas(fav_window)
+        scrollbar = ttk.Scrollbar(fav_window, orient="vertical", command=canvas.yview)
+        scrollable_frame = ttk.Frame(canvas)
+
+        scrollable_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas_window = canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        # Hiển thị danh sách yêu thích trong cửa sổ riêng
         for movie in fav_movies:
-            ttk.Label(frame, text=movie['title'], font=('Arial', 12, 'bold')).pack(anchor='w', pady=2)
-            ttk.Button(frame, text="Xem phim", command=lambda m=movie: self.watch_movie(m)).pack(anchor='w')
-    
-    def refresh_movies(self):
-        """Làm mới danh sách phim"""
-        try:
-            crawler = MotphimCrawler()
-            if crawler.crawl_movies():
-                self.movies = crawler.movies
-                self.save_data()
-                self.display_movies()
-                messagebox.showinfo("Success", "Movies refreshed successfully!")
-            else:
-                messagebox.showerror("Error", "Failed to refresh movies. Please check your internet connection and try again.")
-        except Exception as e:
-            messagebox.showerror("Error", f"An error occurred while refreshing movies: {str(e)}")
-    
+            movie_frame = ttk.Frame(scrollable_frame, padding=10)
+            movie_frame.pack(fill=tk.X, pady=5)
+
+            ttk.Label(movie_frame, text=movie.get('title', 'No title'), font=('Arial', 12, 'bold')).pack(anchor='w')
+            ttk.Button(movie_frame, text="Xem phim", command=lambda m=movie: self.watch_movie(m)).pack(anchor='w', pady=3)
+
+
     def show_register_screen(self):
     # Xóa widget cũ
         for widget in self.root.winfo_children():
@@ -518,8 +557,6 @@ class MovieApp:
         
         file_menu = tk.Menu(self.menu_bar, tearoff=0)
         self.menu_bar.add_cascade(label="File", menu=file_menu)
-        file_menu.add_command(label="Refresh Movies", command=self.refresh_movies)
-        file_menu.add_separator()
         file_menu.add_command(label="Logout", command=self.logout)
         file_menu.add_command(label="Exit", command=self.root.quit)
 
