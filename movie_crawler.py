@@ -6,91 +6,105 @@ import time
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from datetime import datetime
+import re
 
 class MotphimCrawler:
     def __init__(self):
-        self.base_url = "https://motphimtopp.com/phim-le/"
+        self.base_url = ""
         self.movies = []
-        # Cấu hình session với retry mechanism
+        self.headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                          "AppleWebKit/537.36 (KHTML, like Gecko) "
+                          "Chrome/122.0.0.0 Safari/537.36"
+        }
         self.session = requests.Session()
         retries = Retry(total=3, backoff_factor=1, status_forcelist=[500, 502, 503, 504])
         self.session.mount('http://', HTTPAdapter(max_retries=retries))
         self.session.mount('https://', HTTPAdapter(max_retries=retries))
 
-    def crawl_movies(self, num_movies=20):
-        print("Đang lấy danh sách phim từ motphimtopp.com ...")
+    def save_poster_image(self, title, url):
         try:
-            response = self.session.get(self.base_url, timeout=10)
-            response.raise_for_status()
-            soup = BeautifulSoup(response.text, "html.parser")
-            
-            # Lấy tất cả phim mới cập nhật
-            movie_items = soup.select("article.item.movies")
-            print(f"Tìm thấy {len(movie_items)} phim")
-            
-            # Sắp xếp phim theo thời gian cập nhật
-            sorted_movies = []
-            for item in movie_items:
-                try:
-                    # Lấy tên phim và link chi tiết
-                    a_tag = item.select_one("div.data h3 a")
-                    title = a_tag.text.strip() if a_tag else "Unknown"
-                    url = a_tag["href"] if a_tag else ""
+            if not url:
+                return
+            if not os.path.exists("images"):
+                os.makedirs("images")
+            # Định dạng tên
+            clean_name = re.sub(r'[^\w\s]', '', title)  # bỏ dấu :
+            clean_name = clean_name.replace(" ", "_")
+            filename = f"images/{clean_name}.jpg"
+            img = self.session.get(url, headers=self.headers, timeout=10)
+            with open(filename, "wb") as f:
+                f.write(img.content)
+            print(f"🖼️ Lưu ảnh: {filename}")
+        except Exception as e:
+            print(f"Lỗi khi lưu ảnh: {e}")
 
-                    # Lấy poster (ưu tiên data-src, fallback src)
-                    img_tag = item.select_one("div.poster img")
-                    poster_url = ""
-                    if img_tag:
-                        poster_url = img_tag.get("data-src") or img_tag.get("src") or ""
+    def crawl_movies(self, num_movies=50):
+        sorted_movies = []
+        existing_urls = set()
+        page = 1
+        try:
+            while len(sorted_movies) < num_movies:
+                url = self.base_url if page == 1 else f"{self.base_url}page/{page}/"
+                print(f"→ Đang lấy trang {page}: {url}")
+                response = self.session.get(url, headers=self.headers, timeout=10)
+                response.raise_for_status()
+                soup = BeautifulSoup(response.text, "html.parser")
 
-                    # Lấy năm (nằm trong <span> sau tên phim)
-                    year = "Unknown"
-                    year_tag = item.select_one("div.data span")
-                    if year_tag:
-                        # Tìm 4 số cuối cùng trong text
-                        import re
-                        match = re.search(r"\b(19|20)\d{2}\b", year_tag.text)
-                        if match:
-                            year = match.group(0)
+                movie_items = soup.select("article.item.movies")
+                if not movie_items:
+                    break
 
-                    # Lấy rating
-                    rating_tag = item.select_one("div.rating")
-                    rating = rating_tag.text.strip() if rating_tag else "N/A"
+                for item in movie_items:
+                    if len(sorted_movies) >= num_movies:
+                        break
+                    try:
+                        a_tag = item.select_one("div.data h3 a")
+                        title = a_tag.text.strip() if a_tag else "Unknown"
+                        url = a_tag["href"] if a_tag else ""
+                        if url in existing_urls:
+                            continue
+                        existing_urls.add(url)
 
-                    # Lấy mô tả và link xem phim thực sự từ trang chi tiết
-                    description, movie_url = self.get_movie_detail(url)
+                        img_tag = item.select_one("div.poster img")
+                        poster_url = img_tag.get("data-src") or img_tag.get("src") or "" if img_tag else ""
 
-                    movie_data = {
-                        "title": title,
-                        "year": year,
-                        "rating": rating,
-                        "description": description,
-                        "poster_url": poster_url,
-                        "movie_url": movie_url,
-                        "url": url,
-                        "update_time": ""  # Không còn trường update_time
-                    }
-                    sorted_movies.append(movie_data)
-                    print(f"Đã lấy: {title}")
-                    time.sleep(1)
-                except Exception as e:
-                    print(f"Lỗi khi lấy phim: {e}")
-                    continue
-            
-            # Sắp xếp phim theo thời gian cập nhật mới nhất
-            sorted_movies.sort(key=lambda x: x.get('update_time', ''), reverse=True)
-            
-            # Lấy num_movies phim mới nhất
+                        year = "Unknown"
+                        year_tag = item.select_one("div.data span")
+                        if year_tag:
+                            match = re.search(r"\b(19|20)\d{2}\b", year_tag.text)
+                            if match:
+                                year = match.group(0)
+
+                        rating_tag = item.select_one("div.rating")
+                        rating = rating_tag.text.strip() if rating_tag else "N/A"
+
+                        description, movie_url = self.get_movie_detail(url)
+
+                        self.save_poster_image(title, poster_url)
+
+                        movie_data = {
+                            "title": title,
+                            "year": year,
+                            "rating": rating,
+                            "description": description,
+                            "poster_url": poster_url,
+                            "movie_url": movie_url,
+                            "url": url
+                        }
+
+                        sorted_movies.append(movie_data)
+                        print(f"✔ Đã lấy: {title}")
+                        time.sleep(1)
+                    except Exception as e:
+                        print(f"Lỗi khi lấy phim: {e}")
+                        continue
+
+                page += 1
+
             self.movies = sorted_movies[:num_movies]
-                    
-            # Lưu file
-            if not os.path.exists('data'):
-                os.makedirs('data')
-            with open("data/movies.json", "w", encoding="utf-8") as f:
-                json.dump(self.movies, f, ensure_ascii=False, indent=4)
-            print(f"Đã lưu {len(self.movies)} phim mới nhất vào data/movies.json")
             return True
-            
+
         except requests.exceptions.RequestException as e:
             print(f"Lỗi kết nối: {e}")
             return False
@@ -100,27 +114,49 @@ class MotphimCrawler:
 
     def get_movie_detail(self, detail_url):
         try:
-            res = self.session.get(detail_url, timeout=10)
+            res = self.session.get(detail_url, headers=self.headers, timeout=10)
             res.raise_for_status()
             soup = BeautifulSoup(res.text, "html.parser")
-            
-            # Lấy mô tả
+
             desc_tag = soup.find('div', class_='description')
             description = desc_tag.text.strip() if desc_tag else ""
-            
-            # Lấy link xem phim thực sự (iframe player)
+
             iframe = soup.select_one('div.pframe iframe')
             movie_url = iframe["src"] if iframe and iframe.has_attr("src") else detail_url
-            
+
             return description, movie_url
-            
-        except requests.exceptions.RequestException as e:
-            print(f"Lỗi khi lấy chi tiết phim: {e}")
+
+        except Exception:
             return "", detail_url
-        except Exception as e:
-            print(f"Lỗi không xác định khi lấy chi tiết phim: {e}")
-            return "", detail_url
+
+    def crawl_genres(self, num_per_genre=10):
+        genres = {
+            "Kinh dị": "https://motphimtopp.com/the-loai/kinh-di/",
+            "Bí ẩn": "https://motphimtopp.com/the-loai/bi-an/",
+            "Viễn tưởng": "https://motphimtopp.com/the-loai/vien-tuong/",
+            "Chính kịch": "https://motphimtopp.com/the-loai/chinh-kich/",
+            "Hành động": "https://motphimtopp.com/the-loai/hanh-dong/",
+            "Hài hước": "https://motphimtopp.com/the-loai/hai-huoc/",
+            "Hình sự": "https://motphimtopp.com/the-loai/hinh-su/",
+            "Tâm lý": "https://motphimtopp.com/the-loai/tam-ly/"
+        }
+
+        all_movies = []
+
+        for name, url in genres.items():
+            print(f"\n🎬 Đang crawl thể loại: {name}")
+            self.base_url = url
+            if self.crawl_movies(num_per_genre):
+                all_movies.extend(self.movies)
+            time.sleep(2)
+
+        self.movies = all_movies
+        if not os.path.exists('data'):
+            os.makedirs('data')
+        with open("data/movies.json", "w", encoding="utf-8") as f:
+            json.dump(self.movies, f, ensure_ascii=False, indent=4)
+        print(f"\n✅ Đã lưu {len(self.movies)} phim vào data/movies.json")
 
 if __name__ == "__main__":
     crawler = MotphimCrawler()
-    crawler.crawl_movies(10)
+    crawler.crawl_genres(num_per_genre=10)
