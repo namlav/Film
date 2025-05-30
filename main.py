@@ -10,6 +10,10 @@ from tkinterweb import HtmlFrame
 import webbrowser
 from movie_crawler import MotphimCrawler
 import threading
+import re
+from utils import slugify_title
+
+
 
 class MovieApp:
     def __init__(self, root):
@@ -50,7 +54,7 @@ class MovieApp:
         
         # Tạo giao diện đăng nhập
         self.show_login_screen()
-    
+
     def create_directories(self):
         """Tạo các thư mục cần thiết cho ứng dụng"""
         directories = ['data', 'images', 'movies']
@@ -374,26 +378,25 @@ class MovieApp:
 
         # === POSTER ===
         poster_displayed = False
-        poster_path = f"images/{movie['title'].replace(' ', '_')}.jpg"
+        genre_slug = movie.get('genre', '').lower().replace(' ', '-')
+        poster_filename = movie.get("poster_filename") or f"{slugify_title(movie['title'])}.jpg"
+        poster_path = f"images/{genre_slug}/{poster_filename}"
+
+        print(f"🧩 Đang tìm ảnh: {poster_path}")
+
         try:
-            if not os.path.exists(poster_path) and movie.get('poster_url'):
-                response = requests.get(movie['poster_url'], timeout=10)
-                if response.status_code == 200:
-                    with open(poster_path, 'wb') as f:
-                        f.write(response.content)
             if os.path.exists(poster_path):
-                try:
-                    image = Image.open(poster_path)
-                    image = image.resize((100, 150), Image.LANCZOS)
-                    photo = ImageTk.PhotoImage(image)
-                    poster_label = ttk.Label(movie_frame, image=photo, style="Movie.TLabel")
-                    poster_label.image = photo
-                    poster_label.pack(side=tk.LEFT, padx=(10, 15))
-                    poster_displayed = True
-                except UnidentifiedImageError:
-                    print(f"Ảnh lỗi: {poster_path}")
+                image = Image.open(poster_path)
+                image = image.resize((100, 150), Image.LANCZOS)
+                photo = ImageTk.PhotoImage(image)
+                poster_label = ttk.Label(movie_frame, image=photo)
+                poster_label.image = photo
+                poster_label.pack(side=tk.LEFT, padx=(10, 15))
+                poster_displayed = True
+        except UnidentifiedImageError:
+            print(f"⚠️ Ảnh bị lỗi: {poster_path}")
         except Exception as e:
-            print(f"Lỗi tải ảnh: {str(e)}")
+            print(f"❌ Lỗi poster: {e}")
 
         if not poster_displayed:
             ttk.Label(movie_frame, text="[No Poster]", width=15).pack(side=tk.LEFT, padx=(10, 15))
@@ -709,6 +712,8 @@ class MovieApp:
             self.save_data()
             self.create_admin_gui()  # Refresh admin interface
             messagebox.showinfo("Success", "User deleted successfully!")
+
+
 
 if __name__ == "__main__":
     root = tk.Tk()
