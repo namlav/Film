@@ -7,6 +7,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from datetime import datetime
 import re
+from utils import slugify_title
 
 class MotphimCrawler:
     def __init__(self):
@@ -30,8 +31,7 @@ class MotphimCrawler:
         folder = os.path.join("images", genre_slug)
         os.makedirs(folder, exist_ok=True)
 
-        # 👉 Thay mọi ký tự không phải chữ/số bằng "_", bao gồm cả dấu :
-        clean_name = re.sub(r'[^\w]', '_', title)
+        clean_name = slugify_title(title)
         filename = os.path.join(folder, f"{clean_name}.jpg")
 
         for attempt in range(1, retries + 1):
@@ -48,6 +48,7 @@ class MotphimCrawler:
                 time.sleep(1)
 
         print(f"⚠️ Bỏ qua ảnh: {filename} sau {retries} lần thử.")
+
 
 
     def crawl_movies(self, num_movies=50):
@@ -102,8 +103,10 @@ class MotphimCrawler:
                             "poster_url": poster_url,
                             "movie_url": movie_url,
                             "url": url,
-                            "genre": ""  # sẽ thêm sau
-                        }
+                            "genre": "",  # sẽ thêm sau
+                            "poster_filename": f"{slugify_title(title)}.jpg"
+                        }   
+
 
                         sorted_movies.append(movie_data)
                         print(f"✔ Đã lấy: {title}")
@@ -171,7 +174,6 @@ class MotphimCrawler:
         with open("data/movies.json", "w", encoding="utf-8") as f:
             json.dump(self.movies, f, ensure_ascii=False, indent=4)
         print(f"\n✅ Đã lưu {len(self.movies)} phim vào data/movies.json")
-
 
 if __name__ == "__main__":
     crawler = MotphimCrawler()
