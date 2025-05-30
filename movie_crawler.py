@@ -12,6 +12,7 @@ class MotphimCrawler:
     def __init__(self):
         self.base_url = ""
         self.movies = []
+        self.current_genre_slug = ""
         self.headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                           "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -22,22 +23,32 @@ class MotphimCrawler:
         self.session.mount('http://', HTTPAdapter(max_retries=retries))
         self.session.mount('https://', HTTPAdapter(max_retries=retries))
 
-    def save_poster_image(self, title, url):
-        try:
-            if not url:
+    def save_poster_image(self, title, url, genre_slug, retries=3):
+        if not url:
+            return
+
+        folder = os.path.join("images", genre_slug)
+        os.makedirs(folder, exist_ok=True)
+
+        # 👉 Thay mọi ký tự không phải chữ/số bằng "_", bao gồm cả dấu :
+        clean_name = re.sub(r'[^\w]', '_', title)
+        filename = os.path.join(folder, f"{clean_name}.jpg")
+
+        for attempt in range(1, retries + 1):
+            try:
+                print(f"→ Tải ảnh ({attempt}/{retries}): {filename}")
+                img = self.session.get(url, headers=self.headers, timeout=10)
+                img.raise_for_status()
+                with open(filename, "wb") as f:
+                    f.write(img.content)
+                print(f"🖼️ Lưu thành công: {filename}")
                 return
-            if not os.path.exists("images"):
-                os.makedirs("images")
-            # Định dạng tên
-            clean_name = re.sub(r'[^\w\s]', '', title)  # bỏ dấu :
-            clean_name = clean_name.replace(" ", "_")
-            filename = f"images/{clean_name}.jpg"
-            img = self.session.get(url, headers=self.headers, timeout=10)
-            with open(filename, "wb") as f:
-                f.write(img.content)
-            print(f"🖼️ Lưu ảnh: {filename}")
-        except Exception as e:
-            print(f"Lỗi khi lưu ảnh: {e}")
+            except Exception as e:
+                print(f"❌ Lỗi lần {attempt}: {e}")
+                time.sleep(1)
+
+        print(f"⚠️ Bỏ qua ảnh: {filename} sau {retries} lần thử.")
+
 
     def crawl_movies(self, num_movies=50):
         sorted_movies = []
@@ -81,7 +92,7 @@ class MotphimCrawler:
 
                         description, movie_url = self.get_movie_detail(url)
 
-                        self.save_poster_image(title, poster_url)
+                        self.save_poster_image(title, poster_url, self.current_genre_slug)
 
                         movie_data = {
                             "title": title,
@@ -90,7 +101,8 @@ class MotphimCrawler:
                             "description": description,
                             "poster_url": poster_url,
                             "movie_url": movie_url,
-                            "url": url
+                            "url": url,
+                            "genre": ""  # sẽ thêm sau
                         }
 
                         sorted_movies.append(movie_data)
@@ -146,7 +158,10 @@ class MotphimCrawler:
         for name, url in genres.items():
             print(f"\n🎬 Đang crawl thể loại: {name}")
             self.base_url = url
+            self.current_genre_slug = url.rstrip("/").split("/")[-1]
             if self.crawl_movies(num_per_genre):
+                for movie in self.movies:
+                    movie["genre"] = name
                 all_movies.extend(self.movies)
             time.sleep(2)
 
@@ -156,6 +171,7 @@ class MotphimCrawler:
         with open("data/movies.json", "w", encoding="utf-8") as f:
             json.dump(self.movies, f, ensure_ascii=False, indent=4)
         print(f"\n✅ Đã lưu {len(self.movies)} phim vào data/movies.json")
+
 
 if __name__ == "__main__":
     crawler = MotphimCrawler()
