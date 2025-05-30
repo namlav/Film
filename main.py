@@ -213,7 +213,7 @@ class MovieApp:
 
         # Menu File
         file_menu = tk.Menu(self.menu_bar, tearoff=0)
-        self.menu_bar.add_cascade(label="File", menu=file_menu)
+        self.menu_bar.add_cascade(label="Menu", menu=file_menu)
         file_menu.add_separator()
         file_menu.add_command(label="Logout", command=self.logout)
         file_menu.add_command(label="Exit", command=self.root.quit)
@@ -255,7 +255,7 @@ class MovieApp:
         self.movie_frame.pack(fill=tk.BOTH, expand=True)
 
         # Canvas + Scroll
-        self.canvas = tk.Canvas(self.movie_frame)
+        self.canvas = tk.Canvas(self.movie_frame, bg="white")
         self.scrollbar = ttk.Scrollbar(self.movie_frame, orient="vertical", command=self.canvas.yview)
         self.scrollable_frame = ttk.Frame(self.canvas)
 
@@ -337,6 +337,10 @@ class MovieApp:
         for widget in self.scrollable_frame.winfo_children():
             widget.destroy()
 
+        # ✅ Hiện lại scrollbar và bind cuộn
+        self.scrollbar.pack(side="right", fill="y")
+        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+
         movie_list = movies if movies is not None else self.movies
         print("Số lượng phim để hiển thị:", len(movie_list))
 
@@ -355,16 +359,24 @@ class MovieApp:
         # Phân trang
         pagination_frame = ttk.Frame(self.scrollable_frame)
         pagination_frame.pack(pady=10)
+
+        if self.current_page > 0:
+            ttk.Button(pagination_frame, text="Về trang đầu", command=lambda: self.go_to_first_page(movie_list)).pack(side=tk.LEFT, padx=5)
+
         ttk.Button(pagination_frame, text="Trang trước", command=lambda: self.change_page(-1, movie_list)).pack(side=tk.LEFT, padx=5)
         ttk.Label(pagination_frame, text=f"Trang {self.current_page + 1} / {total_pages}").pack(side=tk.LEFT, padx=5)
         ttk.Button(pagination_frame, text="Trang sau", command=lambda: self.change_page(1, movie_list)).pack(side=tk.LEFT, padx=5)
 
-        # Nút quay về trang đầu nếu không ở trang đầu
-        if self.current_page > 0:
-            ttk.Button(pagination_frame, text="Về trang đầu", command=lambda: self.go_to_first_page(movie_list)).pack(side=tk.LEFT, padx=5)
+        if self.current_page < total_pages - 1:
+            ttk.Button(pagination_frame, text="Về trang cuối", command=lambda: self.go_to_last_page(movie_list)).pack(side=tk.LEFT, padx=5)
 
     def go_to_first_page(self, movie_list):
         self.current_page = 0
+        self.display_movies(movie_list)
+
+    def go_to_last_page(self, movie_list):
+        total_pages = (len(movie_list) - 1) // self.movies_per_page + 1
+        self.current_page = total_pages - 1
         self.display_movies(movie_list)
 
     def change_page(self, delta, movie_list):
@@ -428,31 +440,69 @@ class MovieApp:
         else:
             messagebox.showinfo("Thông báo", f"{movie['title']} đã có trong danh sách yêu thích.")
     
+    def remove_from_favorites(self, movie):
+        favorites = self.current_user.get('favorites', [])
+        self.current_user['favorites'] = [f for f in favorites if f['url'] != movie['url']]
+        self.save_data()
+        messagebox.showinfo("Đã xóa", f"Đã xóa '{movie['title']}' khỏi danh sách yêu thích.")
+        self.show_favorites()  # Cập nhật lại giao diện
+
     def show_favorites(self):
+        # Xóa toàn bộ nội dung hiện tại
+        for widget in self.scrollable_frame.winfo_children():
+            widget.destroy()
+
+        # Cho phép cuộn lại và gán scrollbar
+        self.scrollbar.pack(side="right", fill="y")
+        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+
         fav_movies = self.current_user.get('favorites', [])
-        fav_window = tk.Toplevel(self.root)
-        fav_window.title("Danh sách yêu thích")
-        fav_window.geometry("800x600")
 
-        canvas = tk.Canvas(fav_window)
-        scrollbar = ttk.Scrollbar(fav_window, orient="vertical", command=canvas.yview)
-        scrollable_frame = ttk.Frame(canvas)
+        ttk.Label(self.scrollable_frame, text="Danh sách yêu thích", font=('Segoe UI', 16, 'bold')).pack(pady=15)
 
-        scrollable_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-        canvas_window = canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
+        if not fav_movies:
+            ttk.Label(self.scrollable_frame, text="(Chưa có phim yêu thích)").pack(pady=20)
+            return
 
-        canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
-
-        # Hiển thị danh sách yêu thích trong cửa sổ riêng
         for movie in fav_movies:
-            movie_frame = ttk.Frame(scrollable_frame, padding=10)
-            movie_frame.pack(fill=tk.X, pady=5)
+            movie_frame = ttk.Frame(self.scrollable_frame, padding=10)
+            movie_frame.pack(fill=tk.X, pady=5, padx=20)
 
-            ttk.Label(movie_frame, text=movie.get('title', 'No title'), font=('Arial', 12, 'bold')).pack(anchor='w')
-            ttk.Button(movie_frame, text="Xem phim", command=lambda m=movie: self.watch_movie(m)).pack(anchor='w', pady=3)
+            # === POSTER ===
+            poster_displayed = False
+            genre_slug = movie.get('genre', '').lower().replace(' ', '-')
+            clean_name = re.sub(r'[^\w]', '_', movie['title'])
+            poster_path = f"images/{genre_slug}/{clean_name}.jpg"
 
+            try:
+                if os.path.exists(poster_path):
+                    image = Image.open(poster_path)
+                    image = image.resize((80, 120), Image.LANCZOS)
+                    photo = ImageTk.PhotoImage(image)
+                    poster_label = ttk.Label(movie_frame, image=photo)
+                    poster_label.image = photo
+                    poster_label.pack(side=tk.LEFT, padx=(0, 10))
+                    poster_displayed = True
+            except:
+                pass
+
+            if not poster_displayed:
+                ttk.Label(movie_frame, text="[No Poster]", width=15).pack(side=tk.LEFT, padx=(0, 10))
+
+            # === INFO & BUTTONS ===
+            info_frame = ttk.Frame(movie_frame)
+            info_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+            ttk.Label(info_frame, text=movie.get('title', 'No title'), font=('Segoe UI', 13, 'bold')).pack(anchor='w')
+            btn_frame = ttk.Frame(info_frame)
+            btn_frame.pack(anchor='w', pady=5)
+
+            ttk.Button(btn_frame, text="▶ Xem phim", command=lambda m=movie: self.watch_movie(m)).pack(side=tk.LEFT, padx=(0, 10))
+
+            ttk.Button(btn_frame, text="🗑️Xóa khỏi yêu thích", command=lambda m=movie: self.remove_from_favorites(m)).pack(side=tk.LEFT)
+
+        # ✅ Cuộn về đầu sau khi hiển thị
+        self.canvas.yview_moveto(0)
 
     def show_register_screen(self):
     # Xóa widget cũ
@@ -538,24 +588,62 @@ class MovieApp:
         back_link.pack()
         back_link.bind("<Button-1>", lambda e: self.show_login_screen())
 
-
-    
     def logout(self):
         """Đăng xuất"""
         self.current_user = None
         self.show_login_screen()
     
     def show_profile(self):
-        """Hiển thị thông tin người dùng"""
-        if not self.current_user:
-            return
-        
-        profile_window = tk.Toplevel(self.root)
-        profile_window.title("User Profile")
-        profile_window.geometry("300x150")
-        
-        ttk.Label(profile_window, text=f"Username: {self.current_user['username']}", font=('Arial', 12)).pack(pady=10)
-        ttk.Label(profile_window, text=f"Role: {self.current_user['role']}", font=('Arial', 12)).pack(pady=10)
+        # 1. Xóa toàn bộ widget trong cửa sổ chính
+        for widget in self.root.winfo_children():
+            widget.destroy()
+
+        # 2. Tạo lại thanh menu
+        self.menu_bar = tk.Menu(self.root)
+        self.root.config(menu=self.menu_bar)
+
+        file_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.menu_bar.add_cascade(label="Menu", menu=file_menu)
+        file_menu.add_command(label="Logout", command=self.logout)
+        file_menu.add_command(label="Exit", command=self.root.quit)
+
+        user_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.menu_bar.add_cascade(label="User", menu=user_menu)
+        user_menu.add_command(label="Profile", command=self.show_profile)
+        user_menu.add_command(label="Yêu thích", command=self.show_favorites)
+
+        # 3. Tạo main frame chứa giao diện
+        self.main_frame = ttk.Frame(self.root)
+        self.main_frame.pack(fill=tk.BOTH, expand=True)
+
+        main_content = ttk.Frame(self.main_frame)
+        main_content.pack(fill=tk.BOTH, expand=True, pady=40, padx=40)
+
+        # ==== TRÁI: ẢNH ====
+        left_frame = tk.Frame(main_content, width=300, bg="white")
+        left_frame.pack(side=tk.LEFT, fill=tk.Y, padx=20)
+
+        try:
+            img = Image.open("images/Profile.jpg")
+            img = img.resize((200, 200), Image.LANCZOS)
+            self.profile_img = ImageTk.PhotoImage(img)
+            tk.Label(left_frame, image=self.profile_img, bg="white").pack(pady=5)
+        except:
+            tk.Label(left_frame, text="[Không thể tải ảnh]", fg="red", bg="white").pack()
+
+        # ==== PHẢI: THÔNG TIN ====
+        right_frame = tk.Frame(main_content, bg="white")
+        right_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=20)
+
+        ttk.Label(right_frame, text="Thông tin tài khoản", font=("Segoe UI", 16, "bold")).pack(pady=(10, 20))
+        ttk.Label(right_frame, text=f"👤 Username: {self.current_user['username']}", font=("Segoe UI", 12)).pack(anchor='w', pady=5)
+        ttk.Label(right_frame, text=f"🔒 Role: {self.current_user['role']}", font=("Segoe UI", 12)).pack(anchor='w', pady=5)
+
+        num_favorites = len(self.current_user.get('favorites', []))
+        ttk.Label(right_frame, text=f"❤ Số phim yêu thích: {num_favorites}", font=("Segoe UI", 12)).pack(anchor='w', pady=5)
+
+        # ==== NÚT QUAY LẠI ====
+        ttk.Button(right_frame, text="⬅ Quay lại trang chính", command=self.create_main_gui).pack(anchor='w', pady=(30, 5))
 
     def create_admin_gui(self):
         for widget in self.root.winfo_children():
@@ -585,7 +673,7 @@ class MovieApp:
         self.root.config(menu=self.menu_bar)
         
         file_menu = tk.Menu(self.menu_bar, tearoff=0)
-        self.menu_bar.add_cascade(label="File", menu=file_menu)
+        self.menu_bar.add_cascade(label="Menu", menu=file_menu)
         file_menu.add_command(label="Logout", command=self.logout)
         file_menu.add_command(label="Exit", command=self.root.quit)
 
@@ -596,7 +684,7 @@ class MovieApp:
         movies_frame = ttk.Frame(notebook)
         notebook.add(movies_frame, text="Quản lý phim")
 
-        movie_canvas = tk.Canvas(movies_frame)
+        movie_canvas = tk.Canvas(movies_frame, bg="white")
         movie_scrollbar = ttk.Scrollbar(movies_frame, orient="vertical", command=movie_canvas.yview)
         scrollable_movie_frame = ttk.Frame(movie_canvas)
 
@@ -618,7 +706,7 @@ class MovieApp:
         users_frame = ttk.Frame(notebook)
         notebook.add(users_frame, text="Quản lý người dùng")
 
-        user_canvas = tk.Canvas(users_frame)
+        user_canvas = tk.Canvas(users_frame, bg="white")
         user_scrollbar = ttk.Scrollbar(users_frame, orient="vertical", command=user_canvas.yview)
         scrollable_user_frame = ttk.Frame(user_canvas)
 
