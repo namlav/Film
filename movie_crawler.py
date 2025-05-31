@@ -11,7 +11,7 @@ from utils import slugify_title
 
 class MotphimCrawler:
     def __init__(self):
-        self.base_url = ""
+        self.base_url = "https://motphimtopp.com/phim-le/"
         self.movies = []
         self.current_genre_slug = ""
         self.headers = {
