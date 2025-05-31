@@ -616,7 +616,7 @@ class MovieApp:
         user_menu = tk.Menu(self.menu_bar, tearoff=0)
         self.menu_bar.add_cascade(label="User", menu=user_menu)
         user_menu.add_command(label="Profile", command=self.show_profile)
-        user_menu.add_command(label="Yêu thích", command=self.show_favorites)
+        user_menu.add_command(label="Yêu thích", command=self.show_favorites_from_profile)
 
         # 3. Tạo main frame chứa giao diện
         self.main_frame = ttk.Frame(self.root)
@@ -650,6 +650,10 @@ class MovieApp:
 
         # ==== NÚT QUAY LẠI ====
         ttk.Button(right_frame, text="⬅ Quay lại trang chính", command=self.create_main_gui).pack(anchor='w', pady=(30, 5))
+
+    def show_favorites_from_profile(self):
+        self.create_main_gui()
+        self.show_favorites()
 
     def create_admin_gui(self):
         for widget in self.root.winfo_children():
