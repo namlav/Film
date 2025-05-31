@@ -195,17 +195,7 @@ class MovieApp:
         
         messagebox.showerror("Error", "Invalid username or password")
 
-    def _on_mousewheel(self, event):
-        if hasattr(self, 'canvas') and self.canvas.winfo_exists():
-            if event.num == 4 or event.delta > 0:
-                self.canvas.yview_scroll(-1, "units")
-            elif event.num == 5 or event.delta < 0:
-                self.canvas.yview_scroll(1, "units")
-    
     def create_main_gui(self):
-        # Unbind mousewheel nếu đã có canvas cũ
-        if hasattr(self, 'canvas') and self.canvas.winfo_exists():
-            self.canvas.unbind("<MouseWheel>")
         for widget in self.root.winfo_children():
             widget.destroy()
 
@@ -246,37 +236,61 @@ class MovieApp:
         )
         self.criteria_combobox.pack(side=tk.LEFT, padx=5)  # HIỆN combobox
 
+        # Nút tìm kiếm ngay sau combobox loại tìm kiếm
         ttk.Button(search_frame, text="Tìm kiếm", command=self.search_movies).pack(side=tk.LEFT, padx=5)
-        ttk.Button(search_frame, text="Hiện tất cả", command=self.show_all_movies).pack(side=tk.LEFT, padx=5)
 
-        # Không hiển thị các label và entry lọc nâng cao
-        self.rating_filter = tk.StringVar()
-        self.year_filter = tk.StringVar()
+        # Label và combobox bộ lọc
+        ttk.Label(search_frame, text="Bộ lọc phim:").pack(side=tk.LEFT, padx=(15, 2))
+        self.sort_var = tk.StringVar(value="Mặc định")
+        self.sort_combobox = ttk.Combobox(
+            search_frame,
+            textvariable=self.sort_var,
+            values=[
+                "Mặc định",
+                "Tên phim (A-Z)",
+                "Tên phim (Z-A)",
+                "Năm (tăng dần)",
+                "Năm (giảm dần)"
+            ],
+            state="readonly",
+            width=18
+        )
+        self.sort_combobox.pack(side=tk.LEFT, padx=5)
+        self.sort_combobox.bind("<<ComboboxSelected>>", lambda e: self.display_movies())
+
+        # Nút Hiện tất cả ở cuối
+        ttk.Button(search_frame, text="Hiện tất cả", command=self.show_all_movies).pack(side=tk.LEFT, padx=5)
 
         # Frame danh sách phim
         self.movie_frame = ttk.Frame(self.main_frame)
         self.movie_frame.pack(fill=tk.BOTH, expand=True)
 
         # Canvas + Scroll
-        self.canvas = tk.Canvas(self.movie_frame, bg="white")
+        self.canvas = tk.Canvas(self.movie_frame, bg="white", highlightthickness=0)
         self.scrollbar = ttk.Scrollbar(self.movie_frame, orient="vertical", command=self.canvas.yview)
         self.scrollable_frame = ttk.Frame(self.canvas)
-
-        self.scrollable_frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
-        self.canvas.bind("<Configure>", lambda e: self.canvas.itemconfig(self.canvas_window, width=e.width))
-
-        self.canvas_window = self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        self.scrollable_frame_id = self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
         self.canvas.configure(yscrollcommand=self.scrollbar.set)
         self.canvas.pack(side="left", fill="both", expand=True)
         self.scrollbar.pack(side="right", fill="y")
 
+        # Đảm bảo frame nội dung luôn co giãn đúng với canvas
+        def _on_frame_configure(event):
+            self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+        self.scrollable_frame.bind("<Configure>", _on_frame_configure)
+        def _on_canvas_configure(event):
+            self.canvas.itemconfig(self.scrollable_frame_id, width=event.width)
+        self.canvas.bind("<Configure>", _on_canvas_configure)
+
+        # Bind mousewheel cho canvas
+        self.canvas.bind("<Enter>", lambda e: self.canvas.focus_set())
+        self.canvas.bind("<MouseWheel>", lambda event: self.canvas.yview_scroll(int(-1*(event.delta/120)), "units"))
+        self.canvas.bind("<Button-4>", lambda event: self.canvas.yview_scroll(-1, "units"))
+        self.canvas.bind("<Button-5>", lambda event: self.canvas.yview_scroll(1, "units"))
+
         self.movies_per_page = 10  # Hiển thị 10 phim mỗi trang
         self.current_page = 0
         self.display_movies()
-
-        # Bind mousewheel chỉ cho canvas hiện tại
-        self.canvas.bind("<Enter>", lambda e: self.canvas.focus_set())
-        self.canvas.bind("<MouseWheel>", self._on_mousewheel)
 
     def toggle_fullscreen(self, event=None):
         self.is_fullscreen = not self.is_fullscreen
@@ -339,14 +353,27 @@ class MovieApp:
         self.display_movies(filtered)
 
     def display_movies(self, movies=None):
+        # Chỉ xóa widget con của scrollable_frame, không tạo lại canvas/window
         for widget in self.scrollable_frame.winfo_children():
             widget.destroy()
 
-        # ✅ Hiện lại scrollbar và bind cuộn
         self.scrollbar.pack(side="right", fill="y")
-        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
 
         movie_list = movies if movies is not None else self.movies
+
+        # Sắp xếp theo lựa chọn
+        sort_option = getattr(self, 'sort_var', None)
+        if sort_option:
+            sort_value = self.sort_var.get()
+            if sort_value == "Tên phim (A-Z)":
+                movie_list = sorted(movie_list, key=lambda m: m.get('title', '').lower())
+            elif sort_value == "Tên phim (Z-A)":
+                movie_list = sorted(movie_list, key=lambda m: m.get('title', '').lower(), reverse=True)
+            elif sort_value == "Năm (tăng dần)":
+                movie_list = sorted(movie_list, key=lambda m: int(m.get('year', 0)) if str(m.get('year', '')).isdigit() else 0)
+            elif sort_value == "Năm (giảm dần)":
+                movie_list = sorted(movie_list, key=lambda m: int(m.get('year', 0)) if str(m.get('year', '')).isdigit() else 0, reverse=True)
+
         print("Số lượng phim để hiển thị:", len(movie_list))
 
         if not movie_list:
@@ -374,6 +401,8 @@ class MovieApp:
 
         if self.current_page < total_pages - 1:
             ttk.Button(pagination_frame, text="Về trang cuối", command=lambda: self.go_to_last_page(movie_list)).pack(side=tk.LEFT, padx=5)
+
+        self.bind_canvas_focus(self.canvas, self.scrollable_frame)
 
     def go_to_first_page(self, movie_list):
         self.current_page = 0
@@ -462,7 +491,6 @@ class MovieApp:
 
         # Cho phép cuộn lại và gán scrollbar
         self.scrollbar.pack(side="right", fill="y")
-        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
 
         fav_movies = self.current_user.get('favorites', [])
 
@@ -511,9 +539,6 @@ class MovieApp:
             ttk.Button(btn_frame, text="▶ Xem phim", command=lambda m=movie: self.watch_movie(m)).pack(side=tk.LEFT, padx=(0, 10))
 
             ttk.Button(btn_frame, text="🗑️Xóa khỏi yêu thích", command=lambda m=movie: self.remove_from_favorites(m)).pack(side=tk.LEFT)
-
-        # ✅ Cuộn về đầu sau khi hiển thị
-        self.canvas.yview_moveto(0)
 
     def show_register_screen(self):
     # Xóa widget cũ
@@ -662,11 +687,6 @@ class MovieApp:
         self.show_favorites()
 
     def create_admin_gui(self):
-        # Unbind mousewheel nếu đã có canvas cũ
-        if hasattr(self, 'movie_canvas') and self.movie_canvas.winfo_exists():
-            self.movie_canvas.unbind("<MouseWheel>")
-        if hasattr(self, 'user_canvas') and self.user_canvas.winfo_exists():
-            self.user_canvas.unbind("<MouseWheel>")
         for widget in self.root.winfo_children():
             widget.destroy()
 
@@ -692,12 +712,7 @@ class MovieApp:
 
         self.menu_bar = tk.Menu(self.root)
         self.root.config(menu=self.menu_bar)
-        
-        file_menu = tk.Menu(self.menu_bar, tearoff=0)
-        self.menu_bar.add_cascade(label="Menu", menu=file_menu)
-        file_menu.add_command(label="Trang chính", command=self.create_main_gui)
-        file_menu.add_command(label="Logout", command=self.logout)
-        file_menu.add_command(label="Exit", command=self.root.quit)
+        # Ẩn nút menu trên thanh công cụ trong cửa sổ admin (không add_cascade label='Menu')
 
         notebook = ttk.Notebook(right_frame)
         notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
@@ -706,87 +721,86 @@ class MovieApp:
         movies_frame = ttk.Frame(notebook)
         notebook.add(movies_frame, text="Quản lý phim")
 
-        self.movie_canvas = tk.Canvas(movies_frame, bg="white")
-        movie_scrollbar = ttk.Scrollbar(movies_frame, orient="vertical", command=self.movie_canvas.yview)
-        scrollable_movie_frame = ttk.Frame(self.movie_canvas)
-
-        scrollable_movie_frame.bind("<Configure>", lambda e: self.movie_canvas.configure(scrollregion=self.movie_canvas.bbox("all")))
-        self.movie_canvas.create_window((0, 0), window=scrollable_movie_frame, anchor="nw")
-        self.movie_canvas.configure(yscrollcommand=movie_scrollbar.set)
-
-        self.movie_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        movie_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-
-        # Bind mousewheel for movie_canvas (chỉ khi chuột ở trên canvas)
-        self.movie_canvas.bind("<Enter>", lambda e: self.movie_canvas.focus_set())
-        self.movie_canvas.bind("<MouseWheel>", self._on_admin_movie_mousewheel)
+        # Chỉ tạo canvas và window nếu chưa có
+        if not hasattr(self, "movie_canvas"):
+            self.movie_canvas = tk.Canvas(movies_frame, bg="white", highlightthickness=0)
+            movie_scrollbar = ttk.Scrollbar(movies_frame, orient="vertical", command=self.movie_canvas.yview)
+            self.scrollable_movie_frame = ttk.Frame(self.movie_canvas)
+            self.movie_canvas_window = self.movie_canvas.create_window((0, 0), window=self.scrollable_movie_frame, anchor="nw")
+            self.movie_canvas.configure(yscrollcommand=movie_scrollbar.set)
+            self.movie_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+            movie_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+            def _on_frame_configure(event):
+                self.movie_canvas.configure(scrollregion=self.movie_canvas.bbox("all"))
+            self.scrollable_movie_frame.bind("<Configure>", _on_frame_configure)
+            def _on_canvas_configure(event):
+                self.movie_canvas.itemconfig(self.movie_canvas_window, width=event.width)
+            self.movie_canvas.bind("<Configure>", _on_canvas_configure)
+            self.movie_canvas.bind("<Enter>", lambda e: self.movie_canvas.focus_set())
+            self.movie_canvas.bind("<MouseWheel>", lambda event: self.movie_canvas.yview_scroll(int(-1*(event.delta/120)), "units"))
+            self.movie_canvas.bind("<Button-4>", lambda event: self.movie_canvas.yview_scroll(-1, "units"))
+            self.movie_canvas.bind("<Button-5>", lambda event: self.movie_canvas.yview_scroll(1, "units"))
+        else:
+            # Nếu đã có, chỉ clear nội dung
+            for widget in self.scrollable_movie_frame.winfo_children():
+                widget.destroy()
 
         for movie in self.movies:
-            movie_row = ttk.Frame(scrollable_movie_frame, padding=5)
+            movie_row = ttk.Frame(self.scrollable_movie_frame, padding=5)
             movie_row.pack(fill=tk.X, pady=2)
             ttk.Label(movie_row, text=movie["title"], width=40).pack(side=tk.LEFT, padx=5)
             ttk.Button(movie_row, text="Sửa", command=lambda m=movie: self.edit_movie(m)).pack(side=tk.LEFT, padx=2)
             ttk.Button(movie_row, text="Xóa", command=lambda m=movie: self.delete_movie(m)).pack(side=tk.LEFT, padx=2)
 
-        # Bind mousewheel cho toàn bộ widget con của scrollable_movie_frame
-        self.bind_mousewheel_to_children(scrollable_movie_frame, self._on_admin_movie_mousewheel)
-
         # === TAB QUẢN LÝ NGƯỜI DÙNG ===
         users_frame = ttk.Frame(notebook)
         notebook.add(users_frame, text="Quản lý người dùng")
 
-        self.user_canvas = tk.Canvas(users_frame, bg="white")
-        user_scrollbar = ttk.Scrollbar(users_frame, orient="vertical", command=self.user_canvas.yview)
-        scrollable_user_frame = ttk.Frame(self.user_canvas)
+        if not hasattr(self, "user_canvas"):
+            self.user_canvas = tk.Canvas(users_frame, bg="white", highlightthickness=0)
+            user_scrollbar = ttk.Scrollbar(users_frame, orient="vertical", command=self.user_canvas.yview)
+            self.scrollable_user_frame = ttk.Frame(self.user_canvas)
+            self.user_canvas_window = self.user_canvas.create_window((0, 0), window=self.scrollable_user_frame, anchor="nw")
+            self.user_canvas.configure(yscrollcommand=user_scrollbar.set)
+            self.user_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+            user_scrollbar.pack(side=tk.RIGHT, fill="y")
+            def _on_user_frame_configure(event):
+                self.user_canvas.configure(scrollregion=self.user_canvas.bbox("all"))
+            self.scrollable_user_frame.bind("<Configure>", _on_user_frame_configure)
+            def _on_user_canvas_configure(event):
+                self.user_canvas.itemconfig(self.user_canvas_window, width=event.width)
+            self.user_canvas.bind("<Configure>", _on_user_canvas_configure)
+            self.user_canvas.bind("<Enter>", lambda e: self.user_canvas.focus_set())
+            self.user_canvas.bind("<MouseWheel>", lambda event: self.user_canvas.yview_scroll(int(-1*(event.delta/120)), "units"))
+            self.user_canvas.bind("<Button-4>", lambda event: self.user_canvas.yview_scroll(-1, "units"))
+            self.user_canvas.bind("<Button-5>", lambda event: self.user_canvas.yview_scroll(1, "units"))
+        else:
+            for widget in self.scrollable_user_frame.winfo_children():
+                widget.destroy()
 
-        scrollable_user_frame.bind("<Configure>", lambda e: self.user_canvas.configure(scrollregion=self.user_canvas.bbox("all")))
-        self.user_canvas.create_window((0, 0), window=scrollable_user_frame, anchor="nw")
-        self.user_canvas.configure(yscrollcommand=user_scrollbar.set)
-
-        self.user_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        user_scrollbar.pack(side=tk.RIGHT, fill="y")
-
-        # Bind mousewheel for user_canvas (chỉ khi chuột ở trên canvas)
-        self.user_canvas.bind("<Enter>", lambda e: self.user_canvas.focus_set())
-        self.user_canvas.bind("<MouseWheel>", self._on_admin_user_mousewheel)
-
-        # Dòng tiêu đề
-        header = ttk.Frame(scrollable_user_frame, padding=5)
+        header = ttk.Frame(self.scrollable_user_frame, padding=5)
         header.pack(fill=tk.X, pady=(0, 5))
         ttk.Label(header, text="Username", width=20).pack(side=tk.LEFT, padx=5)
         ttk.Label(header, text="Role", width=10).pack(side=tk.LEFT, padx=5)
         ttk.Label(header, text="Actions", width=20).pack(side=tk.LEFT, padx=5)
 
-        # Danh sách user
         for user in self.users:
-            user_row = ttk.Frame(scrollable_user_frame, padding=5)
+            user_row = ttk.Frame(self.scrollable_user_frame, padding=5)
             user_row.pack(fill=tk.X, pady=2)
-
             ttk.Label(user_row, text=user["username"], width=20).pack(side=tk.LEFT, padx=5)
             ttk.Label(user_row, text=user["role"], width=10).pack(side=tk.LEFT, padx=5)
-
-            # Chỉ tạo nút cho user thường
             if user["role"] != "admin":
                 ttk.Button(
                     user_row, text="Khóa/Mở khóa",
                     command=lambda u=user: self.toggle_user_lock(u)
                 ).pack(side=tk.LEFT, padx=2)
-
                 ttk.Button(
                     user_row, text="Xóa",
                     command=lambda u=user: self.delete_user(u)
                 ).pack(side=tk.LEFT, padx=2)
 
-        # Bind mousewheel cho toàn bộ widget con của scrollable_user_frame
-        self.bind_mousewheel_to_children(scrollable_user_frame, self._on_admin_user_mousewheel)
-
-    def _on_admin_movie_mousewheel(self, event):
-        if hasattr(self, 'movie_canvas') and self.movie_canvas.winfo_exists():
-            self.movie_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
-
-    def _on_admin_user_mousewheel(self, event):
-        if hasattr(self, 'user_canvas') and self.user_canvas.winfo_exists():
-            self.user_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        self.bind_canvas_focus(self.movie_canvas, self.scrollable_movie_frame)
+        self.bind_canvas_focus(self.user_canvas, self.scrollable_user_frame)
 
     def edit_movie(self, movie):
         """Sửa thông tin phim"""
@@ -850,12 +864,14 @@ class MovieApp:
             self.create_admin_gui()  # Refresh admin interface
             messagebox.showinfo("Success", "User deleted successfully!")
 
-    def bind_mousewheel_to_children(self, parent, callback):
-        parent.bind("<MouseWheel>", callback)
-        for child in parent.winfo_children():
-            self.bind_mousewheel_to_children(child, callback)
-
-
+    def bind_canvas_focus(self, canvas, scrollable_frame):
+        """Khi chuột đi vào bất kỳ widget con, focus về canvas để cuộn mượt mà"""
+        def on_enter(event):
+            canvas.focus_set()
+        for child in scrollable_frame.winfo_children():
+            child.bind("<Enter>", on_enter)
+            # Đệ quy cho các widget con bên trong
+            self.bind_canvas_focus(canvas, child)
 
 if __name__ == "__main__":
     root = tk.Tk()
