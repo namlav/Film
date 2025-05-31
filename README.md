@@ -7,7 +7,7 @@
 - Giao diện người dùng thân thiện với tkinter
 - Quản lý người dùng (đăng ký, đăng nhập)
 - Phân quyền người dùng (admin/user)
-- CRUD (Create, Read, Update, Delete) cho phim
+- CRUD (Create, Read tài khoản, phim (user/admin), (Update, Delete phim (admin)
 - Crawl dữ liệu phim từ Mọt Phim
 - Lưu trữ dữ liệu bằng JSON
 - Tải và hiển thị poster phim
@@ -21,6 +21,9 @@
   - beautifulsoup4
   - pillow
   - pyinstaller
+  - re
+  - os
+  - json
 
 ## Cài đặt
 
@@ -44,11 +47,13 @@ python main.py
 2. Đăng ký tài khoản mới hoặc đăng nhập với tài khoản hiện có
 
 3. Sử dụng các chức năng:
-   - Xem danh sách phim
-   - Thêm phim mới
-   - Chỉnh sửa thông tin phim
-   - Xóa phim
-   - Tìm kiếm phim
+   - User/Admin:
+     - Xem danh sách phim
+     - Tìm kiếm phim
+   - Adminitrator only:
+     - Thêm phim mới
+     - Chỉnh sửa thông tin phim
+     - Xóa phim
 
 ## Đóng gói ứng dụng
 
