@@ -1,4 +1,3 @@
-#account admin: admin,admin123
 import tkinter as tk
 from tkinter import ttk, messagebox
 import json
@@ -637,7 +636,7 @@ class MovieApp:
         left_frame.pack(side=tk.LEFT, fill=tk.Y, padx=20)
 
         try:
-            img = Image.open("images/Profile.jpg")
+            img = Image.open("images/profile.jfif")
             img = img.resize((200, 200), Image.LANCZOS)
             self.profile_img = ImageTk.PhotoImage(img)
             tk.Label(left_frame, image=self.profile_img, bg="white").pack(pady=5)
