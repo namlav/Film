@@ -405,6 +405,8 @@ class MovieApp:
                 poster_label.image = photo
                 poster_label.pack(side=tk.LEFT, padx=(10, 15))
                 poster_displayed = True
+            else:
+                print(f"❓ Không tìm thấy file poster: {poster_path}")
         except UnidentifiedImageError:
             print(f"⚠️ Ảnh bị lỗi: {poster_path}")
         except Exception as e:
@@ -418,6 +420,7 @@ class MovieApp:
         info_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         ttk.Label(info_frame, text=movie.get('title', 'No title'), font=('Segoe UI', 14, 'bold')).pack(anchor='w', pady=(0, 2))
+        ttk.Label(info_frame, text=f"Thể loại: {movie.get('genre', 'Unknown')}").pack(anchor='w')
         ttk.Label(info_frame, text=f"Năm: {movie.get('year', 'Unknown')}").pack(anchor='w')
         ttk.Label(info_frame, text=f"Rating: {movie.get('rating', 'N/A')}").pack(anchor='w')
         ttk.Label(info_frame, text=movie.get('description', ''), wraplength=550, justify=tk.LEFT).pack(anchor='w', pady=5)
@@ -471,8 +474,8 @@ class MovieApp:
             # === POSTER ===
             poster_displayed = False
             genre_slug = movie.get('genre', '').lower().replace(' ', '-')
-            clean_name = re.sub(r'[^\w]', '_', movie['title'])
-            poster_path = f"images/{genre_slug}/{clean_name}.jpg"
+            poster_filename = movie.get("poster_filename") or f"{slugify_title(movie['title'])}.jpg"
+            poster_path = f"images/{genre_slug}/{poster_filename}"
 
             try:
                 if os.path.exists(poster_path):
@@ -483,8 +486,10 @@ class MovieApp:
                     poster_label.image = photo
                     poster_label.pack(side=tk.LEFT, padx=(0, 10))
                     poster_displayed = True
+                else:
+                    print(f"❓ Không tìm thấy file poster: {poster_path}")
             except:
-                pass
+                print(f"❌ Lỗi khi mở poster: {poster_path}")
 
             if not poster_displayed:
                 ttk.Label(movie_frame, text="[No Poster]", width=15).pack(side=tk.LEFT, padx=(0, 10))
@@ -494,6 +499,7 @@ class MovieApp:
             info_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
             ttk.Label(info_frame, text=movie.get('title', 'No title'), font=('Segoe UI', 13, 'bold')).pack(anchor='w')
+            ttk.Label(info_frame, text=f"Thể loại: {movie.get('genre', 'Unknown')}").pack(anchor='w')
             btn_frame = ttk.Frame(info_frame)
             btn_frame.pack(anchor='w', pady=5)
 
