@@ -7,7 +7,7 @@
 - Giao diện người dùng thân thiện với tkinter
 - Quản lý người dùng (đăng ký, đăng nhập)
 - Phân quyền người dùng (admin/user)
-- CRUD (Create, Read tài khoản, phim (user/admin), (Update, Delete phim (admin)
+- CRUD (Create, Read tài khoản, phim (user/admin), Update, Delete phim (admin))
 - Crawl dữ liệu phim từ Mọt Phim
 - Lưu trữ dữ liệu bằng JSON
 - Tải và hiển thị poster phim
