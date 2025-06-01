@@ -90,7 +90,7 @@ class MovieApp:
         frame.pack(side=tk.LEFT, padx=(50, 10), pady=30)
         frame.pack_propagate(False)
 
-        tk.Label(frame, text="🎬 Movie Manager", font=("Segoe UI", 24, "bold"), fg="#007BFF", bg="white").pack(pady=(10, 30))
+        tk.Label(frame, text="🎬 Movie Stream", font=("Segoe UI", 24, "bold"), fg="#007BFF", bg="white").pack(pady=(10, 30))
 
         try:
             img = Image.open("images/login.png")
@@ -107,7 +107,7 @@ class MovieApp:
         for widget in self.root.winfo_children():
             widget.destroy()
 
-        self.root.title("Movie Manager - Sign In")
+        self.root.title("Movie Stream")
         self.root.geometry("900x500")
         self.root.configure(bg="white")
         self.root.resizable(False, False)
@@ -500,14 +500,11 @@ class MovieApp:
 
     def show_favorites(self):
         # Xóa toàn bộ nội dung hiện tại
-        for widget in self.scrollable_frame.winfo_children():
+        for widget in self.main_frame.winfo_children():
             widget.destroy()
 
-        # Cho phép cuộn lại và gán scrollbar
-        self.scrollbar.pack(side="right", fill="y")
-
-        # Thanh tìm kiếm trong danh sách yêu thích
-        search_frame = ttk.Frame(self.scrollable_frame)
+        # Thanh tìm kiếm trong danh sách yêu thích (ngoài vùng cuộn)
+        search_frame = ttk.Frame(self.main_frame)
         search_frame.pack(fill=tk.X, pady=5)
         fav_search_var = tk.StringVar()
         fav_search_entry = ttk.Entry(search_frame, textvariable=fav_search_var, width=40)
@@ -536,28 +533,45 @@ class MovieApp:
                         match = False
                 if match:
                     filtered.append(movie)
-            self.display_movies(filtered)
+            self.display_favorites(filtered)
         ttk.Button(search_frame, text="Tìm kiếm", command=search_favorites).pack(side=tk.LEFT, padx=5)
         ttk.Button(search_frame, text="Hiện tất cả", command=lambda: self.display_favorites(self.current_user.get('favorites', []))).pack(side=tk.LEFT, padx=5)
 
-        #Hiển thị danh sách yêu thích
-        fav_movies = self.current_user.get('favorites', [])
+        # Tạo lại vùng canvas + scroll cho danh sách phim yêu thích (TẠO MỚI scrollbar, canvas, scrollable_frame)
+        self.movie_frame = ttk.Frame(self.main_frame)
+        self.movie_frame.pack(fill=tk.BOTH, expand=True)
 
-        # Xóa các widget cũ (trừ search_frame)
+        self.canvas = tk.Canvas(self.movie_frame, bg="white", highlightthickness=0)
+        self.canvas.bind("<Enter>", lambda e: self.canvas.focus_set())
+        self.scrollbar = ttk.Scrollbar(self.movie_frame, orient="vertical", command=self.canvas.yview)
+        self.scrollable_frame = ttk.Frame(self.canvas)
+        self.scrollable_frame_id = self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+        self.canvas.pack(side="left", fill="both", expand=True)
+        self.scrollbar.pack(side="right", fill="y")
+
+        def _on_frame_configure(event):
+            self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+        self.scrollable_frame.bind("<Configure>", _on_frame_configure)
+        def _on_canvas_configure(event):
+            self.canvas.itemconfig(self.scrollable_frame_id, width=event.width)
+        self.canvas.bind("<Configure>", _on_canvas_configure)
+
+        # Hiển thị danh sách yêu thích
+        self.display_favorites(self.current_user.get('favorites', []))
+
+    def display_favorites(self, favorites):
+        # Xóa toàn bộ nội dung hiện tại trong scrollable_frame
         for widget in self.scrollable_frame.winfo_children():
-            if isinstance(widget, ttk.Frame):  # giữ lại search_frame
-                continue
             widget.destroy()
 
-        ttk.Label(self.scrollable_frame, text="Danh sách yêu thích", font=('Segoe UI', 16, 'bold')).pack(pady=15)
-
-        if not fav_movies:
-            ttk.Label(self.scrollable_frame, text="(Chưa có phim yêu thích)").pack(pady=20)
+        if not favorites:
+            ttk.Label(self.scrollable_frame, text="Chưa có phim yêu thích.", font=('Segoe UI', 12)).pack(pady=20)
             return
 
-        for movie in fav_movies:
-            movie_frame = ttk.Frame(self.scrollable_frame, padding=10)
-            movie_frame.pack(fill=tk.X, pady=5, padx=20)
+        for movie in favorites:
+            movie_frame = ttk.Frame(self.scrollable_frame, padding=10, style="Movie.TFrame")
+            movie_frame.pack(fill=tk.X, pady=8)
 
             # === POSTER ===
             poster_displayed = False
@@ -565,42 +579,49 @@ class MovieApp:
             poster_filename = movie.get("poster_filename") or f"{slugify_title(movie['title'])}.jpg"
             poster_path = f"images/{genre_slug}/{poster_filename}"
 
+            print(f"🧩 Đang tìm ảnh: {poster_path}")
+
             try:
                 if os.path.exists(poster_path):
                     image = Image.open(poster_path)
-                    image = image.resize((80, 120), Image.LANCZOS)
+                    image = image.resize((100, 150), Image.LANCZOS)
                     photo = ImageTk.PhotoImage(image)
                     poster_label = ttk.Label(movie_frame, image=photo)
                     poster_label.image = photo
-                    poster_label.pack(side=tk.LEFT, padx=(0, 10))
+                    poster_label.pack(side=tk.LEFT, padx=(10, 15))
                     poster_displayed = True
                 else:
                     print(f"❓ Không tìm thấy file poster: {poster_path}")
-            except:
-                print(f"❌ Lỗi khi mở poster: {poster_path}")
+            except UnidentifiedImageError:
+                print(f"⚠️ Ảnh bị lỗi: {poster_path}")
+            except Exception as e:
+                print(f"❌ Lỗi poster: {e}")
 
             if not poster_displayed:
-                ttk.Label(movie_frame, text="[No Poster]", width=15).pack(side=tk.LEFT, padx=(0, 10))
+                ttk.Label(movie_frame, text="[No Poster]", width=15).pack(side=tk.LEFT, padx=(10, 15))
 
-            # === INFO & BUTTONS ===
-            info_frame = ttk.Frame(movie_frame)
+            # === INFO ===
+            info_frame = ttk.Frame(movie_frame, style="Movie.TFrame")
             info_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-            ttk.Label(info_frame, text=movie.get('title', 'No title'), font=('Segoe UI', 13, 'bold')).pack(anchor='w')
+            ttk.Label(info_frame, text=movie.get('title', 'No title'), font=('Segoe UI', 14, 'bold')).pack(anchor='w', pady=(0, 2))
             ttk.Label(info_frame, text=f"Thể loại: {movie.get('genre', 'Unknown')}").pack(anchor='w')
-            btn_frame = ttk.Frame(info_frame)
-            btn_frame.pack(anchor='w', pady=5)
+            ttk.Label(info_frame, text=f"Năm: {movie.get('year', 'Unknown')}").pack(anchor='w')
+            ttk.Label(info_frame, text=f"Rating: {movie.get('rating', 'N/A')}").pack(anchor='w')
+            ttk.Label(info_frame, text=movie.get('description', ''), wraplength=550, justify=tk.LEFT).pack(anchor='w', pady=5)
 
-            ttk.Button(btn_frame, text="▶ Xem phim", command=lambda m=movie: self.watch_movie(m)).pack(side=tk.LEFT, padx=(0, 10))
+            button_frame = ttk.Frame(info_frame)
+            button_frame.pack(anchor='w', pady=(0, 5))
 
-            ttk.Button(btn_frame, text="🗑️Xóa khỏi yêu thích", command=lambda m=movie: self.remove_from_favorites(m)).pack(side=tk.LEFT)
+            ttk.Button(button_frame, text="▶ Xem phim", command=lambda m=movie: self.watch_movie(m)).pack(side=tk.LEFT, padx=(0, 10))
+            ttk.Button(button_frame, text="🗑️ Xóa khỏi yêu thích", command=lambda m=movie: self.remove_from_favorites(m)).pack(side=tk.LEFT)
 
     def show_register_screen(self):
     # Xóa widget cũ
         for widget in self.root.winfo_children():
             widget.destroy()
 
-        self.root.title("Movie Manager - Register")
+        self.root.title("Movie Stream - Register")
         self.root.geometry("900x500")
         self.root.configure(bg="white")
         self.root.resizable(False, False)
