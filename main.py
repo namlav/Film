@@ -259,6 +259,9 @@ class MovieApp:
         self.sort_combobox.pack(side=tk.LEFT, padx=5)
         self.sort_combobox.bind("<<ComboboxSelected>>", lambda e: self.display_movies())
 
+        self.rating_filter = tk.StringVar()
+        self.year_filter = tk.StringVar()
+        
         # Nút Hiện tất cả ở cuối
         ttk.Button(search_frame, text="Hiện tất cả", command=self.show_all_movies).pack(side=tk.LEFT, padx=5)
 
