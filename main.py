@@ -11,6 +11,7 @@ from movie_crawler import MotphimCrawler
 import threading
 import re
 from utils import slugify_title
+import platform
 
 
 
@@ -267,6 +268,15 @@ class MovieApp:
 
         # Canvas + Scroll
         self.canvas = tk.Canvas(self.movie_frame, bg="white", highlightthickness=0)
+        self.canvas.bind("<Enter>", lambda e: self.canvas.focus_set())
+
+        if platform.system() == 'Windows':
+            self.canvas.bind_all("<MouseWheel>", lambda event: self.canvas.yview_scroll(int(-1*(event.delta/120)), "units"))
+        elif platform.system() == 'Darwin':
+            self.canvas.bind_all("<MouseWheel>", lambda event: self.canvas.yview_scroll(int(-1*(event.delta)), "units"))
+        else:
+            self.canvas.bind_all("<Button-4>", lambda event: self.canvas.yview_scroll(-1, "units"))
+            self.canvas.bind_all("<Button-5>", lambda event: self.canvas.yview_scroll(1, "units"))
         self.scrollbar = ttk.Scrollbar(self.movie_frame, orient="vertical", command=self.canvas.yview)
         self.scrollable_frame = ttk.Frame(self.canvas)
         self.scrollable_frame_id = self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
@@ -724,6 +734,15 @@ class MovieApp:
         # Chỉ tạo canvas và window nếu chưa có
         if not hasattr(self, "movie_canvas"):
             self.movie_canvas = tk.Canvas(movies_frame, bg="white", highlightthickness=0)
+            self.movie_canvas.bind("<Enter>", lambda e: self.movie_canvas.focus_set())
+
+            if platform.system() == 'Windows':
+                self.movie_canvas.bind_all("<MouseWheel>", lambda event: self.movie_canvas.yview_scroll(int(-1*(event.delta/120)), "units"))
+            elif platform.system() == 'Darwin':
+                self.movie_canvas.bind_all("<MouseWheel>", lambda event: self.movie_canvas.yview_scroll(int(-1*(event.delta)), "units"))
+            else:
+                self.movie_canvas.bind_all("<Button-4>", lambda event: self.movie_canvas.yview_scroll(-1, "units"))
+                self.movie_canvas.bind_all("<Button-5>", lambda event: self.movie_canvas.yview_scroll(1, "units"))
             movie_scrollbar = ttk.Scrollbar(movies_frame, orient="vertical", command=self.movie_canvas.yview)
             self.scrollable_movie_frame = ttk.Frame(self.movie_canvas)
             self.movie_canvas_window = self.movie_canvas.create_window((0, 0), window=self.scrollable_movie_frame, anchor="nw")
