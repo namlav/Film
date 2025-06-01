@@ -196,7 +196,7 @@ class MovieApp:
         
         messagebox.showerror("Error", "Invalid username or password")
 
-    def create_main_gui(self):
+    def create_main_gui(self, show_search_bar=True):
         for widget in self.root.winfo_children():
             widget.destroy()
 
@@ -221,49 +221,50 @@ class MovieApp:
         self.main_frame = ttk.Frame(self.root)
         self.main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
-        # Thanh tìm kiếm
-        search_frame = ttk.Frame(self.main_frame)
-        search_frame.pack(fill=tk.X, pady=5)
-        self.search_var = tk.StringVar()
-        self.search_entry = ttk.Entry(search_frame, textvariable=self.search_var, width=40)
-        self.search_entry.pack(side=tk.LEFT, padx=5)
-        self.search_criteria = tk.StringVar(value="Tên phim")
-        self.criteria_combobox = ttk.Combobox(
-            search_frame,
-            textvariable=self.search_criteria,
-            values=["Tên phim", "Năm", "Thể loại"],
-            state="readonly",
-            width=12
-        )
-        self.criteria_combobox.pack(side=tk.LEFT, padx=5)  # HIỆN combobox
+        if show_search_bar:
+            # Thanh tìm kiếm
+            search_frame = ttk.Frame(self.main_frame)
+            search_frame.pack(fill=tk.X, pady=5)
+            self.search_var = tk.StringVar()
+            self.search_entry = ttk.Entry(search_frame, textvariable=self.search_var, width=40)
+            self.search_entry.pack(side=tk.LEFT, padx=5)
+            self.search_criteria = tk.StringVar(value="Tên phim")
+            self.criteria_combobox = ttk.Combobox(
+                search_frame,
+                textvariable=self.search_criteria,
+                values=["Tên phim", "Năm", "Thể loại"],
+                state="readonly",
+                width=12
+            )
+            self.criteria_combobox.pack(side=tk.LEFT, padx=5)  # HIỆN combobox
 
-        # Nút tìm kiếm ngay sau combobox loại tìm kiếm
-        ttk.Button(search_frame, text="Tìm kiếm", command=self.search_movies).pack(side=tk.LEFT, padx=5)
+            # Nút tìm kiếm ngay sau combobox loại tìm kiếm
+            ttk.Button(search_frame, text="Tìm kiếm", command=self.search_movies).pack(side=tk.LEFT, padx=5)
 
-        # Label và combobox bộ lọc
-        ttk.Label(search_frame, text="Bộ lọc phim:").pack(side=tk.LEFT, padx=(15, 2))
-        self.sort_var = tk.StringVar(value="Mặc định")
-        self.sort_combobox = ttk.Combobox(
-            search_frame,
-            textvariable=self.sort_var,
-            values=[
-                "Mặc định",
-                "Tên phim (A-Z)",
-                "Tên phim (Z-A)",
-                "Năm (tăng dần)",
-                "Năm (giảm dần)"
-            ],
-            state="readonly",
-            width=18
-        )
-        self.sort_combobox.pack(side=tk.LEFT, padx=5)
-        self.sort_combobox.bind("<<ComboboxSelected>>", lambda e: self.display_movies())
+            # Label và combobox bộ lọc
+            ttk.Label(search_frame, text="Bộ lọc phim:").pack(side=tk.LEFT, padx=(15, 2))
+            self.sort_var = tk.StringVar(value="Mặc định")
+            self.sort_combobox = ttk.Combobox(
+                search_frame,
+                textvariable=self.sort_var,
+                values=[
+                    "Mặc định",
+                    "Tên phim (A-Z)",
+                    "Tên phim (Z-A)",
+                    "Năm (tăng dần)",
+                    "Năm (giảm dần)"
+                ],
+                state="readonly",
+                width=18
+            )
+            self.sort_combobox.pack(side=tk.LEFT, padx=5)
+            self.sort_combobox.bind("<<ComboboxSelected>>", lambda e: self.display_movies())
 
-        self.rating_filter = tk.StringVar()
-        self.year_filter = tk.StringVar()
-        
-        # Nút Hiện tất cả ở cuối
-        ttk.Button(search_frame, text="Hiện tất cả", command=self.show_all_movies).pack(side=tk.LEFT, padx=5)
+            self.rating_filter = tk.StringVar()
+            self.year_filter = tk.StringVar()
+
+            # Nút Hiện tất cả ở cuối
+            ttk.Button(search_frame, text="Hiện tất cả", command=self.show_all_movies).pack(side=tk.LEFT, padx=5)
 
         # Frame danh sách phim
         self.movie_frame = ttk.Frame(self.main_frame)
@@ -505,7 +506,48 @@ class MovieApp:
         # Cho phép cuộn lại và gán scrollbar
         self.scrollbar.pack(side="right", fill="y")
 
+        # Thanh tìm kiếm trong danh sách yêu thích
+        search_frame = ttk.Frame(self.scrollable_frame)
+        search_frame.pack(fill=tk.X, pady=5)
+        fav_search_var = tk.StringVar()
+        fav_search_entry = ttk.Entry(search_frame, textvariable=fav_search_var, width=40)
+        fav_search_entry.pack(side=tk.LEFT, padx=5)
+        fav_criteria = tk.StringVar(value="Tên phim")
+        fav_criteria_combobox = ttk.Combobox(
+            search_frame,
+            textvariable=fav_criteria,
+            values=["Tên phim", "Năm", "Thể loại"],
+            state="readonly",
+            width=12
+        )
+        fav_criteria_combobox.pack(side=tk.LEFT, padx=5)
+        def search_favorites():
+            keyword = fav_search_var.get().strip().lower()
+            criteria = fav_criteria.get()
+            filtered = []
+            for movie in self.current_user.get('favorites', []):
+                match = True
+                if keyword:
+                    if criteria == "Tên phim" and keyword not in movie.get('title', '').lower():
+                        match = False
+                    if criteria == "Năm" and keyword not in str(movie.get('year', '')).lower():
+                        match = False
+                    if criteria == "Thể loại" and keyword not in movie.get('genre', '').lower():
+                        match = False
+                if match:
+                    filtered.append(movie)
+            self.display_movies(filtered)
+        ttk.Button(search_frame, text="Tìm kiếm", command=search_favorites).pack(side=tk.LEFT, padx=5)
+        ttk.Button(search_frame, text="Hiện tất cả", command=lambda: self.display_favorites(self.current_user.get('favorites', []))).pack(side=tk.LEFT, padx=5)
+
+        #Hiển thị danh sách yêu thích
         fav_movies = self.current_user.get('favorites', [])
+
+        # Xóa các widget cũ (trừ search_frame)
+        for widget in self.scrollable_frame.winfo_children():
+            if isinstance(widget, ttk.Frame):  # giữ lại search_frame
+                continue
+            widget.destroy()
 
         ttk.Label(self.scrollable_frame, text="Danh sách yêu thích", font=('Segoe UI', 16, 'bold')).pack(pady=15)
 
@@ -696,7 +738,7 @@ class MovieApp:
         ttk.Button(right_frame, text="⬅ Quay lại trang chính", command=self.create_main_gui).pack(anchor='w', pady=(30, 5))
 
     def show_favorites_from_profile(self):
-        self.create_main_gui()
+        self.create_main_gui(show_search_bar=False)
         self.show_favorites()
 
     def create_admin_gui(self):
