@@ -82,5 +82,12 @@
             }
         ],
         "is_locked": false
+    },
+    {
+        "username": "1",
+        "password": "1",
+        "role": "user",
+        "favorites": [],
+        "is_locked": false
     }
 ]
