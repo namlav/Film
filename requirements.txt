@@ -1,6 +1,0 @@
-tkinter
-requests
-beautifulsoup4
-pillow
-pyinstaller
-tkvideo
