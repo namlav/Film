@@ -1,0 +1,93 @@
+[
+    {
+        "username": "admin",
+        "password": "123",
+        "role": "admin"
+    },
+    {
+        "username": "ad",
+        "password": "123",
+        "role": "user",
+        "favorites": [
+            {
+                "title": "The Bob’s Burgers Movie",
+                "year": "2022",
+                "rating": "6.5",
+                "description": "",
+                "poster_url": "https://motphimtopp.com/wp-content/uploads/2025/05/the-bobs-burgers-movie-thumb-scaled.jpg",
+                "movie_url": "https://motphimtopp.com/phim-le/the-bobs-burgers-movie/",
+                "url": "https://motphimtopp.com/phim-le/the-bobs-burgers-movie/",
+                "genre": "Hài hước",
+                "poster_filename": "The_Bob_s_Burgers_Movie.jpg"
+            },
+            {
+                "title": "Thợ Săn Thành Phố: Thám Tử Shinjuku – City Hunter: Shinjuku Private Eyes",
+                "year": "2019",
+                "rating": "8.4",
+                "description": "",
+                "poster_url": "https://motphimtopp.com/wp-content/uploads/2025/05/tho-san-thanh-pho-tham-tu-shinjuku-thumb.jpg",
+                "movie_url": "https://motphimtopp.com/phim-le/tho-san-thanh-pho-tham-tu-shinjuku/",
+                "url": "https://motphimtopp.com/phim-le/tho-san-thanh-pho-tham-tu-shinjuku/",
+                "genre": "Hài hước",
+                "poster_filename": "Thợ_Săn_Thành_Phố__Thám_Tử_Shinjuku___City_Hunter__Shinjuku_Private_Eyes.jpg"
+            },
+            {
+                "title": "Tay Đua Kiệt Xuất – Rally Road Racers",
+                "year": "2023",
+                "rating": "7.3",
+                "description": "",
+                "poster_url": "https://motphimtopp.com/wp-content/uploads/2025/05/80011ef8d0d0b64197fb8ca6d9dd6df6.jpg",
+                "movie_url": "https://motphimtopp.com/phim-le/tay-dua-kiet-xuat/",
+                "url": "https://motphimtopp.com/phim-le/tay-dua-kiet-xuat/",
+                "genre": "Hài hước",
+                "poster_filename": "Tay_Đua_Kiệt_Xuất___Rally_Road_Racers.jpg"
+            }
+        ],
+        "is_locked": false
+    },
+    {
+        "username": "tp",
+        "password": "123",
+        "role": "user",
+        "favorites": [
+            {
+                "title": "Kỳ Nghỉ Nhớ Đời",
+                "year": "2020",
+                "rating": "1",
+                "description": "",
+                "poster_url": "https://motphimtopp.com/wp-content/uploads/2025/04/b64033e2d8fca36a3541deed2154ea28.jpg",
+                "movie_url": "https://motphimtopp.com/phim-le/ky-nghi-nho-doi/",
+                "url": "https://motphimtopp.com/phim-le/ky-nghi-nho-doi/",
+                "update_time": ""
+            },
+            {
+                "title": "Chuyện Tôi Và Ma Quỷ Thành Người Một Nhà",
+                "year": "2023",
+                "rating": "10",
+                "description": "",
+                "poster_url": "https://motphimtopp.com/wp-content/uploads/2025/04/8709b88069ba3c8ea52f9051595bb234.jpg",
+                "movie_url": "https://motphimtopp.com/phim-le/chuyen-toi-va-ma-quy-thanh-nguoi-mot-nha/",
+                "url": "https://motphimtopp.com/phim-le/chuyen-toi-va-ma-quy-thanh-nguoi-mot-nha/",
+                "update_time": ""
+            },
+            {
+                "title": "Bộ Tứ Báo Thủ",
+                "year": "2025",
+                "rating": "7.1",
+                "description": "",
+                "poster_url": "https://motphimtopp.com/wp-content/uploads/2025/04/xfCtJdLp6lZiBZhrr9OCGhFWXyu.jpg",
+                "movie_url": "https://motphimtopp.com/phim-le/bo-tu-bao-thu/",
+                "url": "https://motphimtopp.com/phim-le/bo-tu-bao-thu/",
+                "update_time": ""
+            }
+        ],
+        "is_locked": false
+    },
+    {
+        "username": "1",
+        "password": "1",
+        "role": "user",
+        "favorites": [],
+        "is_locked": false
+    }
+]
