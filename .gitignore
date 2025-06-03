@@ -2,3 +2,6 @@
 !.gitignore
 !dist/
 dist/**/*
+!README.md
+!main.py
+
